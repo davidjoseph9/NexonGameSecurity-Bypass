@@ -1,0 +1,82 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\MapleStory">
+      <UniqueIdentifier>{d14182da-1d2f-4cb4-b98a-f58aba23a9e1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\PatchManager">
+      <UniqueIdentifier>{8d2e4945-2312-492b-bf0e-3efd044e8fc8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\BlackCipher">
+      <UniqueIdentifier>{93f315fd-81cd-4b6f-8df5-e2a51cbb9360}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\BlackCall">
+      <UniqueIdentifier>{5a6385f9-be90-4ed9-aec0-6c643e5fbc9f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="framework.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MapleStory.h">
+      <Filter>Source Files\MapleStory</Filter>
+    </ClInclude>
+    <ClInclude Include="PatchManager.h">
+      <Filter>Source Files\PatchManager</Filter>
+    </ClInclude>
+    <ClInclude Include="Patch.h">
+      <Filter>Source Files\PatchManager</Filter>
+    </ClInclude>
+    <ClInclude Include="BlackCipher.h">
+      <Filter>Source Files\BlackCipher</Filter>
+    </ClInclude>
+    <ClInclude Include="BlackCall.h">
+      <Filter>Source Files\BlackCall</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dllmain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MapleStoryScripts.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MapleStory.cpp">
+      <Filter>Source Files\MapleStory</Filter>
+    </ClCompile>
+    <ClCompile Include="PatchManager.cpp">
+      <Filter>Source Files\PatchManager</Filter>
+    </ClCompile>
+    <ClCompile Include="Patch.cpp">
+      <Filter>Source Files\PatchManager</Filter>
+    </ClCompile>
+    <ClCompile Include="BlackCipher.cpp">
+      <Filter>Source Files\BlackCipher</Filter>
+    </ClCompile>
+    <ClCompile Include="BlackCall.cpp">
+      <Filter>Source Files\BlackCall</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+    <None Include="README.md" />
+  </ItemGroup>
+</Project>
