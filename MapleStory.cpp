@@ -101,8 +101,6 @@ namespace MapleStory {
 		patchManager.InstallPatch(true, patch2);
 	}
 
-	std::string getMachineIdHookAsm = R"(mov rax, 0x%llX; jmp rax)";
-
 	const unsigned __int64 MIDLib_GetMachineIdHook() {
 		/*
 		 * Original: Gather information from the system and generate an ID
