@@ -56,9 +56,6 @@
     <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MapleStoryScripts.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MapleStory.cpp">
       <Filter>Source Files\MapleStory</Filter>
     </ClCompile>

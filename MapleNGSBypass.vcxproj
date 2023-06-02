@@ -176,7 +176,6 @@
     <ClCompile Include="BlackCipher.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="MapleStory.cpp" />
-    <ClCompile Include="MapleStoryScripts.cpp" />
     <ClCompile Include="PatchManager.cpp" />
     <ClCompile Include="Patch.cpp" />
     <ClCompile Include="pch.cpp">

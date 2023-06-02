@@ -860,7 +860,7 @@ namespace BlackCipher {
 				break;
 			}
 			catch (const std::filesystem::filesystem_error& err) {
-				std::cout << "IPCFile filesystem error: " << err.what() << '\n';
+				printf("IPCFile filesystem error: %s\n", err.what());
 				return false;
 			}
 
@@ -868,7 +868,7 @@ namespace BlackCipher {
 		}
 
 		if (timedout) {
-			std::cout << "Waiting for IPC file timedout" << endl;
+			printf("Waiting for IPC file timedout\n");
 			return false;
 		}
 		std::filesystem::remove(fileName);

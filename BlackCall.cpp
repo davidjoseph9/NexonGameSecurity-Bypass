@@ -549,13 +549,13 @@ namespace BlackCall {
 
 		hMapleStory = GetModuleHandleW(MAPLESTORY_MODULE);
 		if (hMapleStory == NULL) {
-			printf("Failed to get handle of the module %s\n", MAPLESTORY_MODULE);
+			wprintf(L"Failed to get handle of the module %s\n", MAPLESTORY_MODULE);
 			return false;
 		}
 
 		hNtdll = GetModuleHandleW(NTDLL_MODULE);
 		if (hNtdll == NULL) {
-			printf("Failed to get handle of the module %s\n", NTDLL_MODULE);
+			wprintf(L"Failed to get handle of the module %s\n", NTDLL_MODULE);
 			return false;
 		}
 

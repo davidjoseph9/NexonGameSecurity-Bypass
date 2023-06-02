@@ -2,7 +2,6 @@
 #include "Patch.h"
 #include "PatchManager.h"
 #include "MapleStory.h"
-#include "NGClient.h"
 #include "BlackCall.h"
 
 #include <windows.h>
