@@ -72,7 +72,7 @@ namespace BlackCipher {
 	unsigned __int64 bcMemoryCheck1RetAddress = 0x0045B9EB;
 
 	unsigned __int64 bcMemoryCheck2Address = 0x009C2CD7;
-    unsigned __int64 bcMemoryCheck2RetAddress = 0x009C2CE3;
+	unsigned __int64 bcMemoryCheck2RetAddress = 0x009C2CE3;
 
 	unsigned __int64 bcMemoryCheck3Address = 0x004F8CC7;
 	unsigned __int64 bcMemoryCheck3RetAddress = 0x004F8CD4;
