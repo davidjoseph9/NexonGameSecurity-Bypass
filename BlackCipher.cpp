@@ -32,6 +32,7 @@ namespace BlackCipher {
 	LPCWSTR USER32_DLL = L"USER32.DLL";
 	LPCWSTR KERNELBASE_DLL = L"KERNELBASE.DLL";
 	LPCWSTR NTDLL_DLL = L"ntdll.dll";
+	LPCWSTR KERNEL32_DLL = L"KERNEL32.DLL";
 
 	unsigned int MAX_IPC_FILE_WAITTIME = 60; // secs to wait for IPC file created by BlackCipher64 process
 	unsigned int MAX_NTDLLCOPY_WAITTIME = 30;
@@ -40,9 +41,10 @@ namespace BlackCipher {
 
 	char asmBuffer[2048];
 
-	HMODULE hKernelbase = NULL;
 	HMODULE hNtdll = NULL;
 	HMODULE hNtdllCopy = NULL; // BCXXXX.tmp
+	HMODULE hKernelbase = NULL;
+	HMODULE hKernel32 = NULL;
 
 	string ipcDir;
 	char ipcFileName[255];
@@ -55,6 +57,11 @@ namespace BlackCipher {
 	std::list<std::wstring> moduleFilterList = { L"maplestory.exe", L"keystone.dll", L"MapleNGSBypass.dll",  L"vehdebug-x86_64.dll" };
 
 	PROCESSENTRY32W processEntry{ 0 };
+
+	std::list<MODULEENTRY32W> blackcipherModuleList;
+	std::list<MODULEENTRY32W>::iterator blackcipherIterator;
+	std::list<MODULEENTRY32W> maplestoryModuleList;
+	std::list<MODULEENTRY32W>::iterator maplestoryIterator;
 
 	MODULEENTRY32W blackCipherModuleEntry{ 0 };
 	MODULEENTRY32W blackCallModuleEntry{ 0 };
@@ -85,44 +92,13 @@ namespace BlackCipher {
 
 	unsigned __int64 bcMemoryCheck6Address = 0x00ADC7A0;
 	unsigned __int64 bcMemoryCheck6RetAddress = 0x00ADC7AB;
-
 	
 	unsigned __int64 blackCallCopyAddr = NULL;
 
-	DWORD NtQueryVirtualMemory_hook(HANDLE ProcessHandle, PVOID BaseAddress, MEMORY_INFORMATION_CLASS MemoryInformationClass, PVOID MemoryInformation, SIZE_T MemoryInformationLength, PSIZE_T ReturnLength)
-	{
-		HMODULE hModule = NULL;
-		if (ProcessHandle == GetCurrentProcess() && MemoryInformationClass == MemoryBasicInformation)
-		{
-			BYTE* module_base = reinterpret_cast<BYTE*>(GetModuleHandle(NULL));
-
-			IMAGE_DOS_HEADER* dos_header = reinterpret_cast<IMAGE_DOS_HEADER*>(module_base);
-			IMAGE_NT_HEADERS* nt_headers = reinterpret_cast<IMAGE_NT_HEADERS*>(module_base + dos_header->e_lfanew);
-
-			if (BaseAddress < module_base)
-				BaseAddress = module_base;
-			else if (BaseAddress > (module_base + nt_headers->OptionalHeader.SizeOfImage))
-			{
-				memset(MemoryInformation, 0, MemoryInformationLength);
-
-				if (ReturnLength != NULL)
-					*ReturnLength = 0;
-
-				return STATUS_INVALID_PARAMETER;
-			}
-		}
-		else
-		{
-			memset(MemoryInformation, 0, MemoryInformationLength);
-
-			if (ReturnLength != NULL)
-				*ReturnLength = 0;
-
-			return STATUS_ACCESS_DENIED;
-		}
-		return 0;
-	}
-
+	std::string asmReturnFalse = Patch::unindent(R"(
+        xor rax, rax
+		ret
+	)");
 
 	std::string bcNtReadVirtualMemoryAsm = Patch::unindent(R"(
 		push rbx
@@ -687,6 +663,7 @@ namespace BlackCipher {
 		return patchManager.InstallPatch(true, patch);
 	}
 
+	/*
 	VOID WINAPI RtlCaptureContextHook(PCONTEXT context) {
 		printf("0x%llX->RtlCaptureContext;\n", (unsigned __int64)GetCurrentThread());
 
@@ -710,7 +687,7 @@ namespace BlackCipher {
 		patch.targetAddress = (unsigned __int64)&RtlCaptureContextHook;
 
 		return patchManager.InstallPatch(true, patch);
-	}
+	}*/
 
 	std::string KernelBaseIsDebuggerPresentAsm = Patch::unindent(R"(
         xor rax, rax
@@ -733,6 +710,167 @@ namespace BlackCipher {
 		return patchManager.InstallPatch(true, patch);
 	}
 
+	std::string Kernel32Module32FirstWSnapshotAsm = Patch::unindent(R"(
+        push rbx
+        push rdx
+        push r8
+        push r12
+        push r13
+        push r14
+        push r15
+		
+        push rcx
+        push rsi
+        push rdi
+		
+        sub rsp, 8
+
+        mov rcx, rdi
+        mov r12, 0x%llX
+        call r12
+
+        add rsp, 8
+        
+        pop rdi
+        pop rsi
+        pop rcx
+
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop r8
+        pop rdx
+        pop rbx
+
+        ret
+	)");
+	BOOL WINAPI Module32FirstWFilter(MODULEENTRY32W& lpme) {
+		if (lpme.th32ProcessID == processEntry.th32ProcessID) {
+			blackcipherIterator = blackcipherModuleList.begin();
+			memcpy(&lpme, &blackcipherIterator._Ptr->_Myval, sizeof(MODULEENTRY32W));
+			wprintf(L"[KERNEL32.Module32FirstW] BC pid = %X, name = '%s' \n%s\n", lpme.th32ProcessID, lpme.szModule, lpme.szExePath);
+		}
+		else if (lpme.th32ProcessID == processEntry.th32ParentProcessID) {
+			maplestoryIterator = maplestoryModuleList.begin();
+			memcpy(&lpme, &maplestoryIterator._Ptr->_Myval, sizeof(MODULEENTRY32W));
+			wprintf(L"[KERNEL32.Module32FirstW] Maple pid = %X, name = '%s' \n%s\n", lpme.th32ProcessID, lpme.szModule, lpme.szExePath);
+		}
+		return true;
+	}
+
+	bool InstallModule32FirstWPatch(PatchManager& patchManager) {
+		Patch::PatchManager::Patch patch;
+
+		patch.name = "KERNELBASE.Module32FirstW hook";
+		patch.address = (unsigned __int64)GetProcAddress(hKernel32, "Module32FirstW") + 0x128;
+		if (patch.address == NULL) {
+			printf("GetProcAddress 'Module32FirstW' failed");
+			return false;
+		}
+		sprintf(asmBuffer, Kernel32Module32FirstWSnapshotAsm.c_str(), &Module32FirstWFilter);
+
+		patch.patchType = PatchManager::PatchType::HOOK;
+		patch.hookType = PatchManager::HookType::JUMP;
+		
+		patch.assembly = std::string(asmBuffer);
+		patch.hookRegister = "r12";
+		patch.nopCount = 0;
+
+		return patchManager.InstallPatch(true, patch);
+	}
+
+	std::string Kernel32Module32NextWSnapshotAsm = Patch::unindent(R"(
+        mov eax, edi
+        mov rbx, [rsp+0x60]
+        add rsp, 0x50
+        pop rdi
+
+		push rbx
+        push rdx
+        push r8
+        push r9
+        push r12
+        push r13
+        push r14
+        push r15
+		
+        push rcx
+        push rsi
+        push rdi
+		
+
+		mov rcx, rdi
+        sub rsp, 0x8
+
+        mov r12, 0x%llX
+        call r12
+
+        add rsp, 0x8
+        
+        pop rdi
+        pop rsi
+        pop rcx
+
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop r9
+        pop r8
+        pop rdx
+        pop rbx
+
+		ret
+	)");
+	BOOL WINAPI Module32NextWHook(MODULEENTRY32W me) {
+		/*
+		 * Iterate over list of modules from initial filtered snapshot
+		 */
+		if (me.th32ProcessID == processEntry.th32ProcessID) {
+			blackcipherIterator++;
+			if (blackcipherIterator == blackcipherModuleList.end()) {
+				SetLastError(ERROR_NO_MORE_FILES);
+				return false;
+			}
+			memcpy(&me, &blackcipherIterator._Ptr->_Myval, sizeof(MODULEENTRY32W));
+			wprintf(L"[KERNEL32.Module32NextW] BC pid = %X, name = '%s' \n%s\n", me.th32ProcessID, me.szModule, me.szExePath);
+		}
+		else if (me.th32ProcessID == processEntry.th32ParentProcessID) {
+			maplestoryIterator++;
+			if (maplestoryIterator == maplestoryModuleList.end()) {
+				SetLastError(ERROR_NO_MORE_FILES);
+				return false;
+			}
+			memcpy(&me, &maplestoryIterator._Ptr->_Myval, sizeof(MODULEENTRY32W));
+			wprintf(L"[KERNEL32.Module32NextW] Maple pid = %X, name = '%s' \n%s\n", me.th32ProcessID, me.szModule, me.szExePath);
+		}
+		// else { // this should never happen, we filter other processes using NtOpenProcess hook }
+		return true;
+	}
+
+	bool InstallModule32NextWPatch(PatchManager& patchManager) {
+		Patch::PatchManager::Patch patch;
+
+		patch.name = "KERNELBASE.Module32NextW hook";
+
+		patch.address = (unsigned __int64)GetProcAddress(hKernel32, "Module32NextW") + 0x129;
+		if (patch.address == NULL) {
+			printf("GetProcAddress 'Module32NextW' failed");
+			return false;
+		}
+
+		sprintf(asmBuffer, Kernel32Module32NextWSnapshotAsm.c_str(), &Module32NextWHook);
+
+		patch.patchType = PatchManager::PatchType::HOOK;
+		patch.hookType = PatchManager::HookType::JUMP;
+		
+		patch.assembly = std::string(asmBuffer);
+		patch.hookRegister = "r12";
+		patch.nopCount = 0;
+
+		return patchManager.InstallPatch(true, patch);
+	}
 
 	bool LoadBlackCipherModules() {
 		HANDLE hModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, 0);
@@ -741,6 +879,15 @@ namespace BlackCipher {
 		moduleEntry.dwSize = sizeof(MODULEENTRY32W);
 
 		if (Module32FirstW(hModuleSnapshot, &moduleEntry)) {
+			if (blackCipherModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, BLACKCIPHER64) == 0) {
+				memcpy((void*)&blackCipherModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
+				blackCipherCopyAddr = Patch::CopyModule((unsigned __int64)moduleEntry.modBaseAddr, (unsigned __int64)moduleEntry.modBaseSize);
+				if (blackCipherCopyAddr == NULL) {
+					wprintf(L"Failed to create a copy of the %s module\n", BLACKCIPHER64);
+					return false;
+				}
+				blackcipherModuleList.push_back(moduleEntry);
+			}
 			do {
 				if (blackCipherModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, BLACKCIPHER64) == 0) {
 					memcpy((void*)&blackCipherModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
@@ -749,6 +896,7 @@ namespace BlackCipher {
 						wprintf(L"Failed to create a copy of the %s module\n", BLACKCIPHER64);
 						return false;
 					}
+					blackcipherModuleList.push_back(moduleEntry);
 				}
 				else if (bcNtdllModuleEntry.hModule == NULL && endsWithW(moduleEntry.szModule, L".tmp")) {
 					unsigned __int64 procAddress = (unsigned __int64)GetProcAddress(moduleEntry.hModule, "NtReadVirtualMemory");
@@ -760,6 +908,18 @@ namespace BlackCipher {
 							return false;
 						}
 					}
+					// blackcipherModuleList.push_back(bcNtdllModuleEntry);
+				}
+				else {
+					bool bFilter = false;
+					for (auto const& moduleToFilter : moduleFilterList) {
+						if (lstrcmpW(moduleToFilter.c_str(), moduleEntry.szModule) == 0) {
+							bFilter = true;
+						}
+					}
+					if (!bFilter) {
+						blackcipherModuleList.push_back(moduleEntry);
+					}
 				}
 			} while (Module32NextW(hModuleSnapshot, &moduleEntry));
 		}
@@ -770,32 +930,70 @@ namespace BlackCipher {
 		return true;
 	}
 
+
+	bool InstallEnumWindowsPatch(PatchManager& patchManager) {
+		printf("Installing USER32.EnumWindows hook");
+		Patch::PatchManager::Patch patch;
+
+		HMODULE hUser32 = GetModuleHandleW(USER32_DLL);
+		if (hUser32 == NULL) {
+			wprintf(L"Could not get handle of the module %s", USER32_DLL);
+			return false;
+		}
+		patch.name = "USER32.EnumWindows return false";
+		patch.address = (unsigned __int64)GetProcAddress(hUser32, "EnumWindows");
+		if (patch.address == NULL) {
+			printf("GetProcAddress 'USER32.EnumWindows' failed");
+			return false;
+		}
+		sprintf(asmBuffer, asmReturnFalse.c_str());
+		patch.patchType = Patch::PatchManager::PatchType::WRITE;
+
+		patch.assembly = std::string(asmBuffer);
+		return patchManager.InstallPatch(true, patch);
+	}
+
+
 	bool LoadMapleStoryModules() {
 		HANDLE hModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, processEntry.th32ParentProcessID);
 		MODULEENTRY32W moduleEntry;
 
 		moduleEntry.dwSize = sizeof(MODULEENTRY32W);
 
-		if (!Module32FirstW(hModuleSnapshot, &moduleEntry))
+		if (!Module32FirstW(hModuleSnapshot, &moduleEntry)) {
 			return false;
+		}
 
 		if (maplestoryModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, MAPLESTORY) == 0) {
 			memcpy((void*)&maplestoryModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
+			// maplestoryModuleList.push_back(maplestoryModuleEntry);
 		}
 
 		do {
 			if (maplestoryModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, MAPLESTORY) == 0) {
 				memcpy((void*)&maplestoryModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
+				// maplestoryModuleList.push_back(maplestoryModuleEntry);
 			}
 			else if (blackCallModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, BLACKCALL64) == 0) {
 				memcpy((void*)&blackCallModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
+				maplestoryModuleList.push_back(blackCallModuleEntry);
+			}
+			else {
+				bool bFilter = false;
+				for (auto const& moduleToFilter : moduleFilterList) {
+					if (lstrcmpW(moduleToFilter.c_str(), moduleEntry.szModule) == 0) {
+						bFilter = true;
+					}
+				}
+				if (!bFilter) {
+					maplestoryModuleList.push_back(moduleEntry);
+				}
 			}
 		} while (Module32NextW(hModuleSnapshot, &moduleEntry));
 
 		CloseHandle(hModuleSnapshot);
 		return true;
 	}
-
 
 	bool GenerateIPCFile() {
 		sprintf(ipcFileName, "%s/NGSBypass%X-1.lock", ipcDir.c_str(), processEntry.th32ParentProcessID);
@@ -890,6 +1088,12 @@ namespace BlackCipher {
 			return false;
 		}
 
+		hKernel32 = GetModuleHandleW(KERNEL32_DLL);
+		if (hKernel32 == NULL) {
+			wprintf(L"Could not get handle of the module %s", KERNEL32_DLL);
+			return false;
+		}
+
 		HANDLE hProcessSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 		processEntry.dwSize = sizeof(PROCESSENTRY32W);
 		if (Process32FirstW(hProcessSnapShot, &processEntry)) {
@@ -913,8 +1117,6 @@ namespace BlackCipher {
 			LoadBlackCipherModules();
 			Sleep(100);
 		} while (bcNtdllCopyAddress == NULL && counter++ < MAX_NTDLLCOPY_WAITTIME * 10);
-		
-		printf("COMPLETED WAIT FOR NTDLL COPY\n");
 
 		if (bcNtdllCopyAddress == NULL) {
 			wprintf(L"Failed retrieving the address of BlackCipher's ntdll copy (BCXXXX.tmp)");
@@ -951,6 +1153,10 @@ namespace BlackCipher {
 		DWORD currentProcessId = GetCurrentProcessId();
 
 		SuspendProcessThreads(currentProcessId);
+
+		InstallModule32FirstWPatch(patchManager);
+		InstallModule32NextWPatch(patchManager);
+		InstallEnumWindowsPatch(patchManager);
 
 		bool success = InstallAPIRestoreRoutinePatch(patchManager) &&
 			InstallAPIMemoryCheck1Patch(patchManager) &&

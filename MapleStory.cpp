@@ -27,10 +27,6 @@ const unsigned __int64 threadIdCheck1JmpAddress = 0x140DDBF6E;
 const unsigned __int64 threadIdCheck2PatchAddress = 0x140DDBF9E;
 const unsigned __int64 threadIdCheck2JmpAddress = 0x140DDC15E;
 
-const unsigned __int64 maplestoryCreateProcessWPtr = 0x144E61578;
-const unsigned __int64 maplestoryLoadLibraryW = 0x147D1D3AC;
-const unsigned __int64 maplestoryLoadLibraryExWPtr = 0x144E615C0;
-
 namespace MapleStory {
 	LPCWSTR MAPLESTORY_PROCESS = L"MapleStory.exe";
 	LPCWSTR MAPLESTORY_MODULE = L"maplestory.exe";
@@ -100,6 +96,8 @@ namespace MapleStory {
 
 		patchManager.InstallPatch(true, patch2);
 	}
+
+	std::string getMachineIdHookAsm = R"(mov rax, 0x%llX; jmp rax)";
 
 	const unsigned __int64 MIDLib_GetMachineIdHook() {
 		/*
@@ -233,6 +231,7 @@ namespace MapleStory {
 			wprintf(L"Could not get handle of the module %s", KERNELBASE_DLL);
 			return;
 		}
+
 		InstallCrcBypass(patchManager);
 		InstallIsDebuggerPresentPatch(patchManager);
 		InstallNexonAnalyticsLogsPatch(patchManager);
