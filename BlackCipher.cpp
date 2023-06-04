@@ -52,7 +52,7 @@ namespace BlackCipher {
 	unsigned __int64 bcNtdllCopyAddress = NULL;
 	unsigned __int64 blackCipherCopyAddr = NULL;
 
-	std::list<std::wstring> moduleFilterList = { L"maplestory.exe", L"keystone.dll", L"MapleNGSBypass.dll",  L"vehdebug-x86_64.dll" };
+	std::list<std::wstring> moduleExclusionList = { L"keystone.dll", L"MapleNGSBypass.dll",  L"vehdebug-x86_64.dll" }; // maplestory also excluded
 
 	PROCESSENTRY32W processEntry{ 0 };
 
@@ -292,7 +292,7 @@ namespace BlackCipher {
 
 		patch2.address = (unsigned __int64)GetProcAddress((HMODULE)bcNtdllModuleEntry.modBaseAddr, "NtOpenProcess");
 		if (patch2.address == NULL) {
-			printf("Failed to get proc address of NtReadVirtualMemory");
+			printf("Failed to get proc address of NtOpenProcess");
 			return false;
 		}
 		patch2.address += 0x8;
@@ -908,7 +908,7 @@ namespace BlackCipher {
 				}
 				else {
 					bool bFilter = false;
-					for (auto const& moduleToFilter : moduleFilterList) {
+					for (auto const& moduleToFilter : moduleExclusionList) {
 						if (lstrcmpW(moduleToFilter.c_str(), moduleEntry.szModule) == 0) {
 							bFilter = true;
 						}
@@ -976,7 +976,7 @@ namespace BlackCipher {
 			}
 			else {
 				bool bFilter = false;
-				for (auto const& moduleToFilter : moduleFilterList) {
+				for (auto const& moduleToFilter : moduleExclusionList) {
 					if (lstrcmpW(moduleToFilter.c_str(), moduleEntry.szModule) == 0) {
 						bFilter = true;
 					}

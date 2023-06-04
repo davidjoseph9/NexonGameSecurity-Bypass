@@ -84,6 +84,7 @@ namespace MapleStory {
 		patch1.patchType = Patch::PatchManager::PatchType::WRITE;
 		patch1.address = maplestoryCRCBypassAddress;
 		patch1.nopCount = 2;
+
 		patchManager.InstallPatch(true, patch1);
 
 		Patch::PatchManager::Patch patch2;

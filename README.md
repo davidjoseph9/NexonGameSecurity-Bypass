@@ -15,4 +15,4 @@ Game security related features:
 * <b>MachineID</b>         - Generate random machine ID
 * <b>Crash reporter init</b> - Don't initialize the crash reporter
 
-<b>This project is strictly for educational purposes. <br/>It is not intended as a means to provide you with an unfair unadvantage on games protected by Nexon Game Security</b>
+<b>This project is strictly for educational purposes. <br/>It is not intended as a means to provide you with an unfair advantage on games protected by Nexon Game Security</b>
