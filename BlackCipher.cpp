@@ -51,8 +51,6 @@ namespace BlackCipher {
 
 	unsigned __int64 bcNtdllCopyAddress = NULL;
 	unsigned __int64 blackCipherCopyAddr = NULL;
-	unsigned __int64 getFileVersionInfoSizeExWAddr = NULL;
-	unsigned __int64 getFileVersionInfoExWAddr = NULL;
 
 	std::list<std::wstring> moduleFilterList = { L"maplestory.exe", L"keystone.dll", L"MapleNGSBypass.dll",  L"vehdebug-x86_64.dll" };
 
@@ -67,8 +65,6 @@ namespace BlackCipher {
 	MODULEENTRY32W blackCallModuleEntry{ 0 };
 	MODULEENTRY32W maplestoryModuleEntry{ 0 };
 	MODULEENTRY32W bcNtdllModuleEntry{ 0 };
-
-	unsigned __int64 CreateToolhelp32SnapshotAddress;
 
 	unsigned __int64 rtlCaptureContextPtr = 0x006FF648;
 

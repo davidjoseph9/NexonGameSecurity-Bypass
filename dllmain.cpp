@@ -5,7 +5,6 @@
 #include "Patch.h"
 
 #include <iostream>
-#include <keystone/keystone.h>
 
 using namespace std;
 
