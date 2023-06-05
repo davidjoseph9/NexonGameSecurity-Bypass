@@ -147,9 +147,9 @@ namespace BlackCipher {
 		ret
 	)");
 	unsigned __int64 WINAPI BCNtReadVirtualMemoryFilter(HANDLE hProcess, unsigned __int64 lpBaseAddress) {//, SIZE_T numberOfBytesToRead, SIZE_T* lpNumberOfBytesRead) {
-		wprintf(L"[BCXXXX/NTDLL.NtReadVirtualMemory] hProcess = %X, lpBaseAddress = '%llX'\n", (unsigned int)GetProcessId(hProcess), (unsigned __int64)lpBaseAddress);
-		
 		DWORD targetProcessId = GetProcessId(hProcess);
+		wprintf(L"[BCXXXX/NTDLL.NtReadVirtualMemory] pid = %X, lpBaseAddress = '%llX'\n", (unsigned int)targetProcessId, (unsigned __int64)lpBaseAddress);
+		
 		if (targetProcessId == GetCurrentProcessId()) {
 			if (lpBaseAddress >= (unsigned __int64)blackCipherModuleEntry.modBaseAddr &&
 				lpBaseAddress <= (unsigned __int64)blackCipherModuleEntry.modBaseAddr + blackCipherModuleEntry.modBaseSize) {

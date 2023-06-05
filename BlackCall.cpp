@@ -127,7 +127,7 @@ namespace BlackCall {
 	unsigned __int64 WINAPI BCNtReadVirtualMemoryFilter(HANDLE hProcess, LPCVOID lpBaseAddress) {//, SIZE_T numberOfBytesToRead, SIZE_T* lpNumberOfBytesRead) {
 		DWORD targetPid = GetProcessId(hProcess);
 
-		wprintf(L"[BCXXXX/NTDLL.NtReadVirtualMemory] hProcess = 0x%X, lpBaseAddress = 0x%llX\n", 
+		wprintf(L"[BCXXXX/NTDLL.NtReadVirtualMemory] pid = 0x%X, lpBaseAddress = 0x%llX\n", 
 			targetPid, (unsigned __int64)lpBaseAddress);
 
 		if (targetPid == GetCurrentProcessId()) {
@@ -166,9 +166,6 @@ namespace BlackCall {
 	}
 
 	bool InstallBCNtReadVirtualMemoryHook(PatchManager& patchManager) {
-		wprintf(L"Installing BlackCall64 NtReadVirtualMemory hook to %s@0x%llX!!!\n", 
-			bcNtdllModuleEntry.szModule, (unsigned __int64)bcNtdllModuleEntry.modBaseAddr);
-
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BCXXX/BlackCipher64/ntdll.NtReadVirtualMemory hook";
