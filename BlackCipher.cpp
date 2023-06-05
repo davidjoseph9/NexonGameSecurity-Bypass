@@ -21,10 +21,6 @@ using namespace Patch;
 
 
 namespace BlackCipher {
-	typedef enum _MEMORY_INFORMATION_CLASS {
-		MemoryBasicInformation
-	} MEMORY_INFORMATION_CLASS;
-
 	LPCWSTR MAPLESTORY = L"maplestory.exe";
 	LPCWSTR BLACKCIPHER64 = L"BlackCipher64.aes";
 	LPCWSTR BLACKCALL64 = L"BlackCall64.aes";
@@ -35,7 +31,7 @@ namespace BlackCipher {
 	LPCWSTR KERNEL32_DLL = L"KERNEL32.DLL";
 
 	unsigned int MAX_IPC_FILE_WAITTIME = 60; // secs to wait for IPC file created by BlackCipher64 process
-	unsigned int MAX_NTDLLCOPY_WAITTIME = 30;
+	unsigned int MAX_NTDLLCOPY_WAITTIME = 30; // secs to wait for ntdll copy module to load
 
 	PatchManager patchManager = Patch::PatchManager();
 
@@ -52,6 +48,8 @@ namespace BlackCipher {
 	unsigned __int64 bcNtdllCopyAddress = NULL;
 	unsigned __int64 blackCipherCopyAddr = NULL;
 
+	// List of modules to filter for static list of modules created at the start
+	// used in the Module32FirstW and Module32NextW hooks
 	std::list<std::wstring> moduleExclusionList = { L"keystone.dll", L"MapleNGSBypass.dll",  L"vehdebug-x86_64.dll" }; // maplestory also excluded
 
 	PROCESSENTRY32W processEntry{ 0 };
@@ -399,6 +397,10 @@ namespace BlackCipher {
 	)");
 
 	bool InstallAPIRestoreRoutinePatch(PatchManager& patchManager) {
+		/*
+		 * Install patch to bypass routine that periodically
+		 * restores the memory of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC API Restore Routine";
@@ -437,6 +439,10 @@ namespace BlackCipher {
 	)");
 
 	bool InstallAPIMemoryCheck1Patch(PatchManager& patchManager) {
+		/*
+		 * Install patch to bypass memory integrity check that
+		 * checks the integrity of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC API Memory Check 1";
@@ -477,6 +483,10 @@ namespace BlackCipher {
 	)");
 
 	bool InstallAPIMemoryCheck2Patch(PatchManager& patchManager) {
+		/*
+		 * Install patch to bypass memory integrity check that
+		 * checks the integrity of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC API Memory Check 2";
@@ -495,7 +505,6 @@ namespace BlackCipher {
 
 		return patchManager.InstallPatch(true, patch);
 	}
-	// 
 
 	std::string APIMemoryCheck3Asm = Patch::unindent(R"(
         mov rax, [rsp+0x20]
@@ -520,7 +529,10 @@ namespace BlackCipher {
 	)");
 
 	bool InstallAPIMemoryCheck3Patch(PatchManager& patchManager) {
-
+		/*
+		 * Install patch to bypass memory integrity check that
+		 * checks the integrity of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 		
 		patch.name = "BC API Memory Check 3";
@@ -561,6 +573,12 @@ namespace BlackCipher {
 		jmp r8
 	)");
 	bool InstallAPIMemoryCheck4Patch(PatchManager& patchManager) {
+		/*
+		 * Install patch to bypass memory integrity check that reads
+		 * the memory of a subset of methods in the BlackCipher64.aes module
+		 * checks the integrity check responsible for checking the
+		 * integrity of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC API Memory Check 4";
@@ -601,6 +619,12 @@ namespace BlackCipher {
 	)");
 
 	bool InstallAPIMemoryCheck5Patch(PatchManager& patchManager) {
+		/*
+		 * Install patch to bypass memory integrity check that reads
+		 * the memory of a subset of methods in the BlackCipher64.aes module
+		 * checks the integrity check responsible for checking the
+		 * integrity of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC API Memory Check 5";
@@ -640,6 +664,12 @@ namespace BlackCipher {
 	)");
 
 	bool InstallAPIMemoryCheck6Patch(PatchManager& patchManager) {
+		/*
+		 * Install patch to bypass memory integrity check that reads
+		 * the memory of a subset of methods in the BlackCipher64.aes module
+		 * checks the integrity check responsible for checking the
+		 * integrity of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC API Memory Check 6";
@@ -658,32 +688,6 @@ namespace BlackCipher {
 
 		return patchManager.InstallPatch(true, patch);
 	}
-
-	/*
-	VOID WINAPI RtlCaptureContextHook(PCONTEXT context) {
-		printf("0x%llX->RtlCaptureContext;\n", (unsigned __int64)GetCurrentThread());
-
-		RtlCaptureContext(context);
-
-		context->Dr0 = 0;
-		context->Dr1 = 0;
-		context->Dr2 = 0;
-		context->Dr3 = 0;
-		context->Dr6 = 0;
-		context->Dr7 = 0;
-	}
-
-	bool InstallRtlCaptureContextHook(PatchManager& patchManager) {
-		Patch::PatchManager::Patch patch;
-
-		patch.patchType = PatchManager::PatchType::HOOK;
-		patch.hookType = PatchManager::HookType::PTR;
-		patch.name = "ntdll.RtlCaptureContext ptr hook";
-		patch.address = rtlCaptureContextPtr;
-		patch.targetAddress = (unsigned __int64)&RtlCaptureContextHook;
-
-		return patchManager.InstallPatch(true, patch);
-	}*/
 
 	std::string KernelBaseIsDebuggerPresentAsm = Patch::unindent(R"(
         xor rax, rax
@@ -742,6 +746,10 @@ namespace BlackCipher {
         ret
 	)");
 	BOOL WINAPI Module32FirstWFilter(MODULEENTRY32W& lpme) {
+		/*
+		 * KERNEL32.Module32FirstW API hook method
+		 * Return the MODULEENTRY32W from the static list we created at the start
+		 */
 		if (lpme.th32ProcessID == processEntry.th32ProcessID) {
 			blackcipherIterator = blackcipherModuleList.begin();
 			memcpy(&lpme, &blackcipherIterator._Ptr->_Myval, sizeof(MODULEENTRY32W));
@@ -756,6 +764,9 @@ namespace BlackCipher {
 	}
 
 	bool InstallModule32FirstWPatch(PatchManager& patchManager) {
+		/*
+		 * Install the patch to the KERNEL32.Module32FirstW API
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "KERNELBASE.Module32FirstW hook";
@@ -821,7 +832,9 @@ namespace BlackCipher {
 	)");
 	BOOL WINAPI Module32NextWHook(MODULEENTRY32W me) {
 		/*
+		 * KERNEL32.Module32NextW API hook method
 		 * Iterate over list of modules from initial filtered snapshot
+		 * Return false once all of the modules have been iterated through
 		 */
 		if (me.th32ProcessID == processEntry.th32ProcessID) {
 			blackcipherIterator++;
@@ -846,6 +859,9 @@ namespace BlackCipher {
 	}
 
 	bool InstallModule32NextWPatch(PatchManager& patchManager) {
+		/* 
+		 * Install the patch to the KERNEL32.Module32NextW API
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "KERNELBASE.Module32NextW hook";
@@ -869,6 +885,14 @@ namespace BlackCipher {
 	}
 
 	bool LoadBlackCipherModules() {
+		/*
+		 * Load modules loaded in the BlackCipher64.aes process and add them to a list
+		 * The list will later be used for the Module32FirstW and Module32NextW hook
+		 * to iterate over a static list of modules.
+		 * Create a copy of the BlackCipher64.aes module if it's available,
+		 * along with the ntdll.dll copy (BCXXXX.tmp) so they can be used in the memory
+		 * integrity check bypass patches.
+		 */
 		HANDLE hModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, 0);
 		MODULEENTRY32W moduleEntry;
 
@@ -928,7 +952,11 @@ namespace BlackCipher {
 
 
 	bool InstallEnumWindowsPatch(PatchManager& patchManager) {
-		printf("Installing USER32.EnumWindows hook");
+		/*
+		 * Patch USER32.EnumWindows API
+		 * Don't iterate through list of top-level Windows on the screen
+		 * return false
+		 */
 		Patch::PatchManager::Patch patch;
 
 		HMODULE hUser32 = GetModuleHandleW(USER32_DLL);
@@ -951,6 +979,11 @@ namespace BlackCipher {
 
 
 	bool LoadMapleStoryModules() {
+		/*
+		 * Load modules loaded in the MapleStory.exe process and add them to a list
+		 * The list will later be used for the Module32FirstW and Module32NextW hook
+		 * to iterate over a static list of modules.
+		 */
 		HANDLE hModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, processEntry.th32ParentProcessID);
 		MODULEENTRY32W moduleEntry;
 
@@ -992,6 +1025,10 @@ namespace BlackCipher {
 	}
 
 	bool GenerateIPCFile() {
+		/*
+		 * Generate a file used to provide data required for the bypass to the MapleStory.exe process
+		 * Includes the address of the BlackCipher64.aes module copy abd the pid of the current process
+		 */
 		sprintf(ipcFileName, "%s/NGSBypass%X-1.lock", ipcDir.c_str(), processEntry.th32ParentProcessID);
 		printf("Generating IPC file %s\n", ipcFileName);
 
@@ -1019,6 +1056,10 @@ namespace BlackCipher {
 	}
 
 	void ReadIPCFile(char* fileName) {
+		/*
+		 * Read the data file generated by the MapleStory.exe process
+		 * Contains the address to the BlackCall64.aes module copy and the BlackCall64.aes pid
+		 */
 		printf("Reading IPC file\n");
 		string content = ReadTextFile(fileName);
 		vector<string> lines = Split(content.c_str(), '\n');
@@ -1037,6 +1078,10 @@ namespace BlackCipher {
 	}
 
 	bool WaitForIPCFile() {
+		/*
+		 * Wait until the IPC file generated by the MapleStory.exe module becomes available
+		 * then read it or wait until the time elapsed exceeds the allotted time
+		 */
 		char fileName[64];
 		sprintf(fileName, "%s/NGSBypass%X-2", ipcDir.c_str(), processEntry.th32ParentProcessID);
 		printf("Waiting for IPC file %s\n", fileName);
@@ -1070,6 +1115,9 @@ namespace BlackCipher {
 	}
 
 	bool InstallPatches() {
+		/*
+		 * Install patches related to the BlackCipher64.aes module
+		 */
 		patchManager.Setup();
 
 		hNtdll = GetModuleHandleW(NTDLL_DLL);

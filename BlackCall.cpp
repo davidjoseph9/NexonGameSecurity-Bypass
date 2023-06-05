@@ -23,7 +23,7 @@ using namespace Patch;
 
 namespace BlackCall {
 	unsigned int MAX_IPC_FILE_WAITTIME = 60; // secs to wait for IPC file created by BlackCipher64 process
-	unsigned int MAX_NTDLLCOPY_WAITTIME = 30;
+	unsigned int MAX_NTDLLCOPY_WAITTIME = 30; // secs to wait for ntdll copy module to load
 
 	LPCWSTR BLACKCIPHER64 = L"BlackCipher64.aes";
 	LPCWSTR BLACKCALL64 = L"BlackCall64.aes";
@@ -55,21 +55,24 @@ namespace BlackCall {
 	unsigned __int64 bcMemoryCheck4Offset = 0xB7CB58;
 	unsigned __int64 bcMemoryCheck4RetOffset = 0xB7CB69;
 
+	unsigned __int64 bcDebuggerCheck1Offset = 0x22C6D4;
+	unsigned __int64 bcDebuggerCheck2Offset = 0x22D08C;
+	unsigned __int64 bcDebuggerCheck3Offset = 0x233C00;
+
 	unsigned __int64 blackCipherCopyAddr = NULL;
 	unsigned __int64 blackCallCopyAddr = NULL;
 	unsigned __int64 bcNtdllCopyAddr = NULL;
-
-	std::list<std::wstring> moduleFilterList = { L"keystone.dll", L"MapleNGSBypass.dll",  L"vehdebug-x86_64.dll" };
-
-	std::list<MODULEENTRY32W> blackCallModuleList;
-	std::list<MODULEENTRY32W>::iterator bcModuleIterator;
 
 	MODULEENTRY32W bcNtdllModuleEntry;
 	MODULEENTRY32W blackCallModuleEntry;
 	MODULEENTRY32W blackCipherModuleEntry;
 
-	unsigned int maplestoryPid = -1;
 	unsigned int blackCipherPid = -1;
+
+	std::string asmReturnFalse = Patch::unindent(R"(
+        xor rax, rax
+		ret
+	)");
 
 	std::string bcNtReadVirtualMemoryAsm = Patch::unindent(R"(
 		push rbx
@@ -203,6 +206,10 @@ namespace BlackCall {
 	)");
 
 	void InstallAPIRestoreRoutinePatch(PatchManager& patchManager) {
+		/*
+		 * Install patch to bypass routine that periodically 
+		 * restores the memory of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC API Restore Routine";
@@ -243,7 +250,11 @@ namespace BlackCall {
 	)");
 
 	void InstallBCMemoryCheck1Hook(PatchManager& patchManager) {
-		Patch::PatchManager::Patch patch; // bcMemoryCheckRetAddress
+		/*
+		 * Install patch to bypass memory integrity check that
+		 * checks the integrity of the ntdll.dll copy
+		 */
+		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC Memory Integrity check 1";
 		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcMemoryCheck1Offset;
@@ -288,6 +299,10 @@ namespace BlackCall {
 	)");
 
 	void InstallBCMemoryCheck2Hook(PatchManager& patchManager) {
+		/*
+		 * Install patch to bypass memory integrity check that 
+		 * checks the integrity of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC Memory Integrity check 2";
@@ -331,6 +346,12 @@ namespace BlackCall {
 	)");
 
 	void InstallBCMemoryCheck3Hook(PatchManager& patchManager) {
+		/*
+		 * Install patch to bypass memory integrity check that reads
+		 * the memory of a subset of methods in the BlackCall64.aes module
+		 * checks the integrity check responsible for checking the
+		 * integrity of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC Memory Integrity check 3";
@@ -373,6 +394,12 @@ namespace BlackCall {
 	)");
 
 	void InstallBCMemoryCheck4Hook(PatchManager& patchManager) {
+		/*
+		 * Install patch to bypass memory integrity check that reads 
+		 * the memory of a subset of methods in the BlackCall64.aes module
+		 * checks the integrity check responsible for checking the
+		 * integrity of the ntdll.dll copy
+		 */
 		Patch::PatchManager::Patch patch;
 
 		patch.name = "BC Memory Integrity check 4";
@@ -394,7 +421,114 @@ namespace BlackCall {
 		patchManager.InstallPatch(true, patch);
 	}
 
+	bool InstallDebuggerCheckPatches(PatchManager& patchManager) {
+		/*
+		 * Installs patches to bypass debugger checks that use a combination 
+		 * of KERNELBASE.RaiseException, VirtualUnwindEx, RtlCaptureContext2
+		 */ 
+		Patch::PatchManager::Patch patch;
+		
+		patch.name = "BlackCall64.aes Debugger check 1";
+		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcDebuggerCheck1Offset;
+		patch.patchType = Patch::PatchManager::PatchType::WRITE;
+		sprintf(asmBuffer, asmReturnFalse.c_str());
+		patch.assembly = std::string(asmBuffer);
+
+		patch.name = "BlackCall64.aes Debugger check 2";
+		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcDebuggerCheck2Offset;
+		patch.patchType = Patch::PatchManager::PatchType::WRITE;
+		sprintf(asmBuffer, asmReturnFalse.c_str());
+		patch.assembly = std::string(asmBuffer);
+
+		patch.name = "BlackCall64.aes Debugger check 3";
+		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcDebuggerCheck3Offset;
+		patch.patchType = Patch::PatchManager::PatchType::WRITE;
+		sprintf(asmBuffer, asmReturnFalse.c_str());
+		patch.assembly = std::string(asmBuffer);
+
+		return patchManager.InstallPatch(true, patch) &&
+			patchManager.InstallPatch(true, patch) &&
+			patchManager.InstallPatch(true, patch);
+	}
+	void LoadMapleStoryModules() {
+		/*
+		 * Load modules loaded in the MapleStory.exe process and add them to a list
+		 * The list will later be used for the Module32FirstW and Module32NextW hook
+		 * to iterate over a static list of modules.
+		 * Create a copy of the BlackCall64.aes module if it's available,
+		 * along with the ntdll.dll copy (BCXXXX.tmp) so they can be used in the memory
+		 * integrity check bypass patches.
+		 */
+		HANDLE hModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, 0);
+
+		MODULEENTRY32W moduleEntry;
+		moduleEntry.dwSize = sizeof(MODULEENTRY32W);
+
+		if (Module32FirstW(hModuleSnapshot, &moduleEntry)) {
+			// BlackCall64.aes and BCXXXX.tmp (ntdll) are never first
+			do {
+				if (blackCallCopyAddr == NULL && lstrcmpW(moduleEntry.szModule, BLACKCALL64) == 0) {
+					memcpy((void*)&blackCallModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
+					blackCallCopyAddr = Patch::CopyModule((unsigned __int64)blackCallModuleEntry.modBaseAddr, (unsigned __int64)blackCallModuleEntry.modBaseSize);
+					if (blackCallCopyAddr == NULL) {
+						wprintf(L"Failed to copy the %s module\n", BLACKCALL64);
+						break;
+					}
+					wprintf(L"Successfully created copy of %s 0x%llX\n", BLACKCALL64, blackCallCopyAddr);
+				}
+				else if (bcNtdllCopyAddr == NULL && endsWithW(moduleEntry.szModule, L".tmp")) {
+					unsigned __int64 procAddress = (unsigned __int64)GetProcAddress(moduleEntry.hModule, "NtReadVirtualMemory");
+					if (procAddress != NULL) {
+						memcpy((void*)&bcNtdllModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
+						bcNtdllCopyAddr = Patch::CopyModule((unsigned __int64)bcNtdllModuleEntry.modBaseAddr, (unsigned __int64)bcNtdllModuleEntry.modBaseSize);
+						if (bcNtdllCopyAddr == NULL) {
+							printf("Failed to copy the BCXXXX.tmp (ntdll.dll copy)");
+							break;
+						}
+					}
+				}
+			} while (Module32NextW(hModuleSnapshot, &moduleEntry));
+		}
+	}
+
+	bool LoadBlackCipherModules() {
+		/*
+		 * Load modules loaded in the BlackCipher64.aes process and add them to a list
+		 * The list will later be used for the Module32FirstW and Module32NextW hook
+		 * to iterate over a static list of modules.
+		 * Create a copy of the BlackCipher64.aes module if it's available so it can
+		 * can later be used in the NtReadVirtualMemory hook to bypass the security modules
+		 * integrity checks
+		 */
+		HANDLE hModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, blackCipherPid);
+
+		MODULEENTRY32W moduleEntry;
+		moduleEntry.dwSize = sizeof(MODULEENTRY32W);
+
+		if (!Module32FirstW(hModuleSnapshot, &moduleEntry)) {
+			return false;
+		}
+
+		if (lstrcmpW(moduleEntry.szModule, BLACKCIPHER64) == 0) {
+			memcpy((void*)&blackCipherModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
+		}
+		else {
+			do {
+				if (lstrcmpW(moduleEntry.szModule, BLACKCIPHER64) == 0) {
+					memcpy((void*)&blackCipherModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
+					break;
+				}
+			} while (Module32NextW(hModuleSnapshot, &moduleEntry));
+		}
+
+		return true;
+	}
+
 	bool GenerateIPCFile() {
+		/*
+		 * Generate a file used to provide data required for the bypass to the BlackCipher64.aes process
+		 * Includes the address of the BlackCall64.aes module copy 
+		 */
 		DWORD processId = GetCurrentProcessId();
 
 		char lockedFileName[128];
@@ -422,6 +556,10 @@ namespace BlackCall {
 	}
 
 	void ReadIPCFile(char* fileName) {
+		/*
+		 * Read the data file generated by the BlackCipher64.aes process
+		 * Contains the address to the BlackCipher64.aes module copy and the BlackCipher64.aes pid
+		 */
 		printf("Reading IPC file %s\n", fileName);
 		string content = ReadTextFile(fileName);
 		printf(content.c_str());
@@ -447,6 +585,10 @@ namespace BlackCall {
 	}
 
 	bool WaitForIPCFile() {
+		/*
+		 * Wait until the IPC file generated by the BlackCipher64.aes module becomes available
+		 * then read it or wait until the time elapsed exceeds the allotted time
+		 */
 		DWORD processId = GetCurrentProcessId();
 
 		char fileName[64];
@@ -481,70 +623,10 @@ namespace BlackCall {
 		return true;
 	}
 
-	void LoadMapleStoryModules() {
-		HANDLE hModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, 0);
-
-		MODULEENTRY32W moduleEntry;
-		moduleEntry.dwSize = sizeof(MODULEENTRY32W);
-
-		if (Module32FirstW(hModuleSnapshot, &moduleEntry)) {
-			// BlackCall64.aes and BCXXXX.tmp (ntdll) are never first
-			do {
-				if (blackCallCopyAddr == NULL && lstrcmpW(moduleEntry.szModule, BLACKCALL64) == 0) {
-					memcpy((void*)&blackCallModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
-					blackCallCopyAddr = Patch::CopyModule((unsigned __int64)blackCallModuleEntry.modBaseAddr, (unsigned __int64)blackCallModuleEntry.modBaseSize);
-					if (blackCallCopyAddr == NULL) {
-						wprintf(L"Failed to copy the %s module\n", BLACKCALL64);
-						break;
-					}
-					wprintf(L"Successfully created copy of %s 0x%llX\n", BLACKCALL64, blackCallCopyAddr);
-				}
-				else if (bcNtdllCopyAddr == NULL && endsWithW(moduleEntry.szModule, L".tmp")) {
-					unsigned __int64 procAddress = (unsigned __int64)GetProcAddress(moduleEntry.hModule, "NtReadVirtualMemory");
-					if (procAddress != NULL) {
-						memcpy((void*)&bcNtdllModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
-						bcNtdllCopyAddr = Patch::CopyModule((unsigned __int64)bcNtdllModuleEntry.modBaseAddr, (unsigned __int64)bcNtdllModuleEntry.modBaseSize);
-						if (bcNtdllCopyAddr == NULL) {
-							printf("Failed to copy the BCXXXX.tmp (ntdll.dll copy)");
-							break;
-						}
-					}
-				}
-			} while (Module32NextW(hModuleSnapshot, &moduleEntry));
-		}
-	}
-
-	bool LoadBlackCipherModules() {
-		HANDLE hModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, blackCipherPid);
-
-		MODULEENTRY32W moduleEntry;
-		moduleEntry.dwSize = sizeof(MODULEENTRY32W);
-
-		if (!Module32FirstW(hModuleSnapshot, &moduleEntry)) {
-			return false;
-		}
-
-		if (lstrcmpW(moduleEntry.szModule, BLACKCIPHER64) == 0) {
-			memcpy((void*)&blackCipherModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
-		}
-		else {
-			do {
-				if (lstrcmpW(moduleEntry.szModule, BLACKCIPHER64) == 0) {
-					memcpy((void*)&blackCipherModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
-					break;
-				}
-			} while (Module32NextW(hModuleSnapshot, &moduleEntry));
-		}
-		
-		return true;
-	}
-
-	/*
-	 * Install BlackCall64.aes patches
-	 *
-	 * @param - hModule - BlackCall64 module handle
-	 */
 	bool InstallHooks() {
+		/*
+		 * Install patches related to the BlackCall64.aes module
+		 */
 		patchManager.Setup();
 
 		hMapleStory = GetModuleHandleW(MAPLESTORY_MODULE);
@@ -602,6 +684,8 @@ namespace BlackCall {
 		InstallBCMemoryCheck4Hook(patchManager);
 
 		InstallBCNtReadVirtualMemoryHook(patchManager);
+
+		InstallDebuggerCheckPatches(patchManager);
 
 		ResumeProcessThreads(threadId);
 

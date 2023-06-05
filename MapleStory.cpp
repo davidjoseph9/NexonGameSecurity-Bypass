@@ -27,6 +27,8 @@ const unsigned __int64 threadIdCheck1JmpAddress = 0x140DDBF6E;
 const unsigned __int64 threadIdCheck2PatchAddress = 0x140DDBF9E;
 const unsigned __int64 threadIdCheck2JmpAddress = 0x140DDC15E;
 
+const unsigned __int64 debuggerCheck1Address = 0x14484E64C;
+
 namespace MapleStory {
 	LPCWSTR MAPLESTORY_PROCESS = L"MapleStory.exe";
 	LPCWSTR MAPLESTORY_MODULE = L"maplestory.exe";
