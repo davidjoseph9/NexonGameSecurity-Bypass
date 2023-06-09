@@ -1,8 +1,7 @@
-#include "pch.h"
-#include "Patch.h"
-#include "PatchManager.h"
-#include "BlackCipher.h"
-#include "MapleStory.h"
+#include "../Patch/Patch.h"
+#include "../Patch/PatchManager.h"
+#include "../BlackCipher/BlackCipher.h"
+#include "../MapleStory/MapleStory.h"
 
 #include <vector>
 #include <string>
@@ -186,7 +185,7 @@ namespace BlackCipher {
 		}
 		patch.address += 0x8;
 
-		sprintf(asmBuffer, bcNtReadVirtualMemoryAsm.c_str(), &BCNtReadVirtualMemoryFilter);
+		sprintf_s(asmBuffer, bcNtReadVirtualMemoryAsm.c_str(), &BCNtReadVirtualMemoryFilter);
 
 		patch.patchType = PatchManager::PatchType::HOOK;
 		patch.hookType = PatchManager::HookType::JUMP;
@@ -275,7 +274,7 @@ namespace BlackCipher {
 		}
 		patch1.address += 0x8;
 
-		sprintf(asmBuffer, bcNtOpenProcessAsm.c_str(), &NtOpenProcessHook);
+		sprintf_s(asmBuffer, bcNtOpenProcessAsm.c_str(), &NtOpenProcessHook);
 
 		patch1.patchType = PatchManager::PatchType::HOOK;
 		patch1.hookType = PatchManager::HookType::JUMP;
@@ -295,7 +294,7 @@ namespace BlackCipher {
 		}
 		patch2.address += 0x8;
 
-		sprintf(asmBuffer, bcNtOpenProcessAsm.c_str(), &NtOpenProcessHook);
+		sprintf_s(asmBuffer, bcNtOpenProcessAsm.c_str(), &NtOpenProcessHook);
 
 		patch2.patchType = PatchManager::PatchType::HOOK;
 		patch2.hookType = PatchManager::HookType::JUMP;
@@ -371,7 +370,7 @@ namespace BlackCipher {
 			return false;
 		}
 		patch.address += 0x8;
-		sprintf(asmBuffer, bcNtQuerySystemInformationAsm.c_str(), &NtQuerySystemInformation, STATUS_ACCESS_DENIED);
+		sprintf_s(asmBuffer, bcNtQuerySystemInformationAsm.c_str(), &NtQuerySystemInformation, STATUS_ACCESS_DENIED);
 		patch.patchType = PatchManager::PatchType::HOOK;
 		patch.hookType = PatchManager::HookType::JUMP;
 		patch.name = "BCXXX.tmp/ntdll.NtQuerySystemInformation hook";
@@ -406,7 +405,7 @@ namespace BlackCipher {
 		patch.name = "BC API Restore Routine";
 
 		patch.address = bcAPIRestoreRoutineAddress;
-		sprintf(asmBuffer, APIRestoreRoutineAsm.c_str(), bcAPIRestoreRoutineRetAddress);
+		sprintf_s(asmBuffer, APIRestoreRoutineAsm.c_str(), bcAPIRestoreRoutineRetAddress);
 
 		patch.patchType = PatchManager::PatchType::HOOK;
 		patch.hookType = PatchManager::HookType::JUMP;
@@ -447,7 +446,7 @@ namespace BlackCipher {
 
 		patch.name = "BC API Memory Check 1";
 		patch.address = bcMemoryCheck1Address;
-		sprintf(asmBuffer, bcMemoryCheck1Asm.c_str(), bcNtdllModuleEntry.modBaseAddr,
+		sprintf_s(asmBuffer, bcMemoryCheck1Asm.c_str(), bcNtdllModuleEntry.modBaseAddr,
 			bcNtdllModuleEntry.modBaseSize, bcNtdllModuleEntry.modBaseAddr,
 			bcNtdllCopyAddress, bcMemoryCheck1RetAddress);
 
@@ -492,7 +491,7 @@ namespace BlackCipher {
 		patch.name = "BC API Memory Check 2";
 
 		patch.address = bcMemoryCheck2Address;
-		sprintf(asmBuffer, APIMemoryCheck2Asm.c_str(), bcNtdllModuleEntry.modBaseAddr,
+		sprintf_s(asmBuffer, APIMemoryCheck2Asm.c_str(), bcNtdllModuleEntry.modBaseAddr,
 			bcNtdllModuleEntry.modBaseSize, bcNtdllModuleEntry.modBaseAddr, bcNtdllCopyAddress, 
 			bcMemoryCheck2RetAddress);
 
@@ -538,7 +537,7 @@ namespace BlackCipher {
 		patch.name = "BC API Memory Check 3";
 
 		patch.address = bcMemoryCheck3Address;
-		sprintf(asmBuffer, APIMemoryCheck3Asm.c_str(), bcNtdllModuleEntry.modBaseAddr, 
+		sprintf_s(asmBuffer, APIMemoryCheck3Asm.c_str(), bcNtdllModuleEntry.modBaseAddr, 
 			bcNtdllModuleEntry.modBaseSize, bcNtdllModuleEntry.modBaseAddr, bcNtdllCopyAddress, 
 			bcMemoryCheck3RetAddress);
 
@@ -584,7 +583,7 @@ namespace BlackCipher {
 		patch.name = "BC API Memory Check 4";
 
 		patch.address = bcMemoryCheck4Address;
-		sprintf(asmBuffer, APIMemoryCheck4Asm.c_str(), blackCipherModuleEntry.modBaseAddr, 
+		sprintf_s(asmBuffer, APIMemoryCheck4Asm.c_str(), blackCipherModuleEntry.modBaseAddr, 
 			blackCipherModuleEntry.modBaseSize, blackCipherModuleEntry.modBaseAddr, 
 			blackCipherCopyAddr, bcMemoryCheck4RetAddress);
 
@@ -630,7 +629,7 @@ namespace BlackCipher {
 		patch.name = "BC API Memory Check 5";
 
 		patch.address = bcMemoryCheck5Address;
-		sprintf(asmBuffer, bcMemoryCheck5Asm.c_str(), blackCipherModuleEntry.modBaseAddr,
+		sprintf_s(asmBuffer, bcMemoryCheck5Asm.c_str(), blackCipherModuleEntry.modBaseAddr,
 			blackCipherModuleEntry.modBaseSize, blackCipherModuleEntry.modBaseAddr,
 			blackCipherCopyAddr, bcMemoryCheck5RetAddress);
 
@@ -675,7 +674,7 @@ namespace BlackCipher {
 		patch.name = "BC API Memory Check 6";
 
 		patch.address = bcMemoryCheck6Address;
-		sprintf(asmBuffer, APIMemoryCheck6Asm.c_str(), blackCipherModuleEntry.modBaseAddr,
+		sprintf_s(asmBuffer, APIMemoryCheck6Asm.c_str(), blackCipherModuleEntry.modBaseAddr,
 			blackCipherModuleEntry.modBaseSize, blackCipherModuleEntry.modBaseAddr, 
 			blackCipherCopyAddr, bcMemoryCheck6RetAddress);
 
@@ -775,7 +774,7 @@ namespace BlackCipher {
 			printf("GetProcAddress 'Module32FirstW' failed");
 			return false;
 		}
-		sprintf(asmBuffer, Kernel32Module32FirstWSnapshotAsm.c_str(), &Module32FirstWFilter);
+		sprintf_s(asmBuffer, Kernel32Module32FirstWSnapshotAsm.c_str(), &Module32FirstWFilter);
 
 		patch.patchType = PatchManager::PatchType::HOOK;
 		patch.hookType = PatchManager::HookType::JUMP;
@@ -872,7 +871,7 @@ namespace BlackCipher {
 			return false;
 		}
 
-		sprintf(asmBuffer, Kernel32Module32NextWSnapshotAsm.c_str(), &Module32NextWHook);
+		sprintf_s(asmBuffer, Kernel32Module32NextWSnapshotAsm.c_str(), &Module32NextWHook);
 
 		patch.patchType = PatchManager::PatchType::HOOK;
 		patch.hookType = PatchManager::HookType::JUMP;
@@ -970,7 +969,7 @@ namespace BlackCipher {
 			printf("GetProcAddress 'USER32.EnumWindows' failed");
 			return false;
 		}
-		sprintf(asmBuffer, asmReturnFalse.c_str());
+		sprintf_s(asmBuffer, asmReturnFalse.c_str());
 		patch.patchType = Patch::PatchManager::PatchType::WRITE;
 
 		patch.assembly = std::string(asmBuffer);
@@ -1029,23 +1028,23 @@ namespace BlackCipher {
 		 * Generate a file used to provide data required for the bypass to the MapleStory.exe process
 		 * Includes the address of the BlackCipher64.aes module copy abd the pid of the current process
 		 */
-		sprintf(ipcFileName, "%s/NGSBypass%X-1.lock", ipcDir.c_str(), processEntry.th32ParentProcessID);
+		sprintf_s(ipcFileName, "%s/NGSBypass%X-1.lock", ipcDir.c_str(), processEntry.th32ParentProcessID);
 		printf("Generating IPC file %s\n", ipcFileName);
 
 		std::filesystem::path path{ ipcFileName };
 		std::ofstream ofs(path);
 
 		char content[64];
-		sprintf(content, "blackCipher64Copy=0x%llX\n", blackCipherCopyAddr);
+		sprintf_s(content, "blackCipher64Copy=0x%llX\n", blackCipherCopyAddr);
 		ofs << content;
-		sprintf(content, "pid=0x%X\n", GetCurrentProcessId());
+		sprintf_s(content, "pid=0x%X\n", GetCurrentProcessId());
 		ofs << content;
 		ofs.close();
 
 		printf(content);
 
 		char newFileName[64];
-		sprintf(newFileName, "%s/NGSBypass%X-1", ipcDir.c_str(), processEntry.th32ParentProcessID);
+		sprintf_s(newFileName, "%s/NGSBypass%X-1", ipcDir.c_str(), processEntry.th32ParentProcessID);
 		if (std::rename(ipcFileName, newFileName)) {
 			printf("Error renaming the IPC file to %s\n", newFileName);
 			return false;
@@ -1083,7 +1082,7 @@ namespace BlackCipher {
 		 * then read it or wait until the time elapsed exceeds the allotted time
 		 */
 		char fileName[64];
-		sprintf(fileName, "%s/NGSBypass%X-2", ipcDir.c_str(), processEntry.th32ParentProcessID);
+		sprintf_s(fileName, "%s/NGSBypass%X-2", ipcDir.c_str(), processEntry.th32ParentProcessID);
 		printf("Waiting for IPC file %s\n", fileName);
 
 		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();

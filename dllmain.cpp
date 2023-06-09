@@ -1,8 +1,8 @@
 #include "pch.h"
-#include "PatchManager.h"
-#include "BlackCipher.h"
-#include "MapleStory.h"
-#include "Patch.h"
+#include "./Patch/PatchManager.h"
+#include "./BlackCipher/BlackCipher.h"
+#include "./MapleStory/MapleStory.h"
+#include "./Patch/Patch.h"
 
 #include <iostream>
 

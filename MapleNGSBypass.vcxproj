@@ -139,7 +139,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;MAPLENGSBYPASS_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>false</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>C:\Users\david\OneDrive\Desktop\Jinja2C++\Installed\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <BufferSecurityCheck>false</BufferSecurityCheck>
@@ -163,27 +163,22 @@
     </ProjectReference>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="BlackCall.h" />
-    <ClInclude Include="BlackCipher.h" />
+    <ClInclude Include="BlackCall\BlackCall.h" />
+    <ClInclude Include="BlackCipher\BlackCipher.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="MapleStory.h" />
-    <ClInclude Include="Patch.h" />
-    <ClInclude Include="PatchManager.h" />
-    <ClInclude Include="pch.h" />
+    <ClInclude Include="MapleStory\MapleStory.h" />
+    <ClInclude Include="NexonLauncher\NexonLauncher.h" />
+    <ClInclude Include="Patch\Patch.h" />
+    <ClInclude Include="Patch\PatchManager.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="BlackCall.cpp" />
-    <ClCompile Include="BlackCipher.cpp" />
+    <ClCompile Include="BlackCall\BlackCall.cpp" />
+    <ClCompile Include="BlackCipher\BlackCipher.cpp" />
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="MapleStory.cpp" />
-    <ClCompile Include="PatchManager.cpp" />
-    <ClCompile Include="Patch.cpp" />
-    <ClCompile Include="pch.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="MapleStory\MapleStory.cpp" />
+    <ClCompile Include="NexonLauncher\NexonLauncher.cpp" />
+    <ClCompile Include="Patch\PatchManager.cpp" />
+    <ClCompile Include="Patch\Patch.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

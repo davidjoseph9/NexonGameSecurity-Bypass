@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "Patch.h"
 #include "PatchManager.h"
 
@@ -204,7 +203,7 @@ namespace Patch {
 	}
 
 	unsigned char* PatchManager::GetJumpPatchBytes(unsigned __int64 targetAddress, char* jumpRegister, SIZE_T* asmSize) {
-		sprintf(asmCode, "mov %s, 0x%llx; jmp %s;\n", jumpRegister, targetAddress, jumpRegister);
+		sprintf_s(asmCode, "mov %s, 0x%llx; jmp %s;\n", jumpRegister, targetAddress, jumpRegister);
 		size_t count;
 		unsigned char* encode;
 

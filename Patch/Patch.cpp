@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "Patch.h"
 #include "PatchManager.h"
 

@@ -1,6 +1,5 @@
-#include "pch.h"
-#include "PatchManager.h"
-#include "Patch.h"
+#include "../Patch/PatchManager.h"
+#include "../Patch/Patch.h"
 
 
 #include <string>
@@ -14,7 +13,6 @@
 
 #include <Psapi.h>
 #include <TlHelp32.h>
-
 
 #define ASM_BUFF_SIZE 2048
 #define FILENAME_BUFF_SIZE 2048
@@ -175,7 +173,7 @@ namespace BlackCall {
 			return false;
 		}
 		patch.address += 0x8;
-		sprintf(asmBuffer, bcNtReadVirtualMemoryAsm.c_str(), &BCNtReadVirtualMemoryFilter);
+		sprintf_s(asmBuffer, bcNtReadVirtualMemoryAsm.c_str(), &BCNtReadVirtualMemoryFilter);
 
 		patch.patchType = PatchManager::PatchType::HOOK;
 		patch.hookType = PatchManager::HookType::JUMP;
@@ -211,7 +209,7 @@ namespace BlackCall {
 
 		patch.name = "BC API Restore Routine";
 		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcAPIOverwriteRoutineOffset;
-		sprintf(asmBuffer, APIRestoreRoutine1Asm.c_str(), 
+		sprintf_s(asmBuffer, APIRestoreRoutine1Asm.c_str(), 
 			(unsigned __int64)blackCallModuleEntry.modBaseAddr + bcAPIOverwriteRoutineRetOffset);
 		patch.patchType = PatchManager::PatchType::HOOK;
 		patch.hookType = PatchManager::HookType::JUMP;
@@ -255,7 +253,7 @@ namespace BlackCall {
 
 		patch.name = "BC Memory Integrity check 1";
 		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcMemoryCheck1Offset;
-		sprintf(
+		sprintf_s(
 			asmBuffer,
 			bcMemoryCheck1Asm.c_str(),
 			(unsigned __int64)bcNtdllModuleEntry.modBaseAddr,
@@ -305,7 +303,7 @@ namespace BlackCall {
 		patch.name = "BC Memory Integrity check 2";
 		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcMemoryCheck2Offset;
 
-		sprintf(asmBuffer, bcMemoryCheck2Asm.c_str(),
+		sprintf_s(asmBuffer, bcMemoryCheck2Asm.c_str(),
 			(unsigned __int64)bcNtdllModuleEntry.modBaseAddr,
 			bcNtdllModuleEntry.modBaseSize,
 			(unsigned __int64)bcNtdllModuleEntry.modBaseAddr,
@@ -353,7 +351,7 @@ namespace BlackCall {
 
 		patch.name = "BC Memory Integrity check 3";
 		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcMemoryCheck3Offset;
-		sprintf(asmBuffer, bcMemoryCheck3Asm.c_str(),
+		sprintf_s(asmBuffer, bcMemoryCheck3Asm.c_str(),
 			blackCallModuleEntry.modBaseAddr,
 			blackCallModuleEntry.modBaseSize,
 			blackCallModuleEntry.modBaseAddr,
@@ -401,7 +399,7 @@ namespace BlackCall {
 
 		patch.name = "BC Memory Integrity check 4";
 		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcMemoryCheck4Offset;
-		sprintf(asmBuffer, bcMemoryCheck4Asm.c_str(),
+		sprintf_s(asmBuffer, bcMemoryCheck4Asm.c_str(),
 			blackCallModuleEntry.modBaseAddr,
 			blackCallModuleEntry.modBaseSize,
 			blackCallModuleEntry.modBaseAddr,
@@ -428,19 +426,19 @@ namespace BlackCall {
 		patch.name = "BlackCall64.aes Debugger check 1";
 		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcDebuggerCheck1Offset;
 		patch.patchType = Patch::PatchManager::PatchType::WRITE;
-		sprintf(asmBuffer, asmReturnFalse.c_str());
+		sprintf_s(asmBuffer, asmReturnFalse.c_str());
 		patch.assembly = std::string(asmBuffer);
 
 		patch.name = "BlackCall64.aes Debugger check 2";
 		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcDebuggerCheck2Offset;
 		patch.patchType = Patch::PatchManager::PatchType::WRITE;
-		sprintf(asmBuffer, asmReturnFalse.c_str());
+		sprintf_s(asmBuffer, asmReturnFalse.c_str());
 		patch.assembly = std::string(asmBuffer);
 
 		patch.name = "BlackCall64.aes Debugger check 3";
 		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcDebuggerCheck3Offset;
 		patch.patchType = Patch::PatchManager::PatchType::WRITE;
-		sprintf(asmBuffer, asmReturnFalse.c_str());
+		sprintf_s(asmBuffer, asmReturnFalse.c_str());
 		patch.assembly = std::string(asmBuffer);
 
 		return patchManager.InstallPatch(true, patch) &&
@@ -529,18 +527,18 @@ namespace BlackCall {
 		DWORD processId = GetCurrentProcessId();
 
 		char lockedFileName[128];
-		sprintf(lockedFileName, "%s/NGSBypass%X-2.lock", ipcDir.c_str(), processId);
+		sprintf_s(lockedFileName, "%s/NGSBypass%X-2.lock", ipcDir.c_str(), processId);
 		std::remove(lockedFileName); // delete file if exists
 		printf("Generating IPC file %s\n", lockedFileName);
 		char content[128];
 		std::filesystem::path path{ lockedFileName };
 		std::ofstream ofs(path);
-		sprintf(content, "blackCall64Copy=0x%llX\n", blackCallCopyAddr);
+		sprintf_s(content, "blackCall64Copy=0x%llX\n", blackCallCopyAddr);
 		ofs << content;
 		ofs.close();
 
 		char unlockedFileName[128];
-		sprintf(unlockedFileName, "%s/NGSBypass%X-2", ipcDir.c_str(), processId);
+		sprintf_s(unlockedFileName, "%s/NGSBypass%X-2", ipcDir.c_str(), processId);
 		std::remove(unlockedFileName); // delete file if exists
 
 		if (std::rename(lockedFileName, unlockedFileName)) {
@@ -589,7 +587,7 @@ namespace BlackCall {
 		DWORD processId = GetCurrentProcessId();
 
 		char fileName[64];
-		sprintf(fileName, "%s/NGSBypass%X-1", ipcDir.c_str(), processId);
+		sprintf_s(fileName, "%s/NGSBypass%X-1", ipcDir.c_str(), processId);
 
 		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 		bool timedout = false;

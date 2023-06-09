@@ -1,7 +1,6 @@
 #pragma once
-#include "pch.h"
-#include "Patch.h"
-#include "PatchManager.h"
+#include "../Patch/Patch.h"
+#include "../Patch/PatchManager.h"
 #include <TlHelp32.h>
 
 using namespace Patch;

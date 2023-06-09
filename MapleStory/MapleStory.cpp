@@ -1,8 +1,7 @@
-#include "pch.h"
-#include "Patch.h"
-#include "PatchManager.h"
-#include "MapleStory.h"
-#include "BlackCall.h"
+#include "../Patch/Patch.h"
+#include "../Patch/PatchManager.h"
+#include "../MapleStory/MapleStory.h"
+#include "../BlackCall/BlackCall.h"
 
 #include <windows.h>
 #include <random>
