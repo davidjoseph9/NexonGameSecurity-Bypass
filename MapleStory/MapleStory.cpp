@@ -15,18 +15,18 @@ HMODULE hKernelbase = NULL;
 
 unsigned __int64 maplestoryBaseAddress = 0;
 
-const unsigned __int64 maplestoryCRCHookAddress = 0x147E53D37;
-const unsigned __int64 maplestoryCRCBypassAddress = 0x147E4D2EC;
-const unsigned __int64 maplestoryCRCBypassReturnAddress = 0x148067112;
-const unsigned __int64 maplestoryCRCRegionSize = 0xE0D3000;
+const unsigned __int64 maplestoryCRCHookAddress = 0x148058E3E;
+const unsigned __int64 maplestoryCRCBypassAddress = 0x14816DDD3;
+const unsigned __int64 maplestoryCRCBypassReturnAddress = 0x147FD865D;
+const unsigned __int64 maplestoryCRCRegionSize = 0xE589000;
 
-const unsigned __int64 threadIdCheck1PatchAddress = 0x140DDBDAE;
-const unsigned __int64 threadIdCheck1JmpAddress = 0x140DDBF6E;
+const unsigned __int64 threadIdCheck1PatchAddress = 0x140E0048E;
+const unsigned __int64 threadIdCheck1JmpAddress = 0x140E0064E;
 
-const unsigned __int64 threadIdCheck2PatchAddress = 0x140DDBF9E;
-const unsigned __int64 threadIdCheck2JmpAddress = 0x140DDC15E;
+const unsigned __int64 threadIdCheck2PatchAddress = 0x140E0067E;
+const unsigned __int64 threadIdCheck2JmpAddress = 0x140E0083E;
 
-const unsigned __int64 debuggerCheck1Address = 0x14484E64C;
+const unsigned __int64 unknownRoutine1Address = 0x141E9F6A0;
 
 namespace MapleStory {
 	LPCWSTR MAPLESTORY_PROCESS = L"MapleStory.exe";
@@ -216,6 +216,16 @@ namespace MapleStory {
 		return patchManager.InstallPatch(true, patch);
 	}
 
+	bool InstallUnknownRoutinePatch(PatchManager& patchManager) {
+		Patch::PatchManager::Patch patch;
+		patch.address = unknownRoutine1Address;
+		patch.name = "Unknown routine patch - heavily virtualized";
+		patch.assembly = std::string(asmReturnFalse);
+		patch.patchType = Patch::PatchManager::PatchType::WRITE;
+
+		return patchManager.InstallPatch(true, patch);
+	}
+
 	void InstallPatches()
 	{
 		if (!BlackCall::InstallHooks()) {
@@ -233,12 +243,14 @@ namespace MapleStory {
 			wprintf(L"Could not get handle of the module %s", KERNELBASE_DLL);
 			return;
 		}
-
 		InstallCrcBypass(patchManager);
+		InstallThreadIdCheckPatch(patchManager);
+
 		InstallIsDebuggerPresentPatch(patchManager);
 		InstallNexonAnalyticsLogsPatch(patchManager);
 		InstallGetMachineIdHook(patchManager);
 		InstallCrashReporterPatch(patchManager);
-		InstallThreadIdCheckPatch(patchManager);
+
+		//InstallUnknownRoutinePatch(patchManager); // heavily virtualized routine; not necessary
 	}
 }
