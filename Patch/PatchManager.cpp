@@ -57,14 +57,9 @@ namespace Patch {
 	}
 
 	bool PatchManager::TogglePatch(bool enable, string patchName) {
-		printf("Toggle the patch %s\n", patchName.c_str());
-		if (!this->patchMap.count(patchName)) {
-			printf("The patch %s cannot be found", patchName.c_str());
-			//lastError = std::string(logBuff);
-			return false;
-		}
-		
-
+		auto patch = this->patchMap.find(patchName);
+		if (patch == this->patchMap.end()) return false;
+		patch->second->enabled = enable;
 		return true;
 	}
 

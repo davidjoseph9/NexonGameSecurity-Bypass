@@ -6,6 +6,11 @@
 #include <windows.h>
 #include <random>
 #include <chrono>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <chrono>
+#include <filesystem>
 
 #define BUFF_SIZE 2048
 
@@ -37,6 +42,8 @@ namespace MapleStory {
 	LPCWSTR KERNELBASE_DLL = L"KERNELBASE.dll";
 
 	PatchManager patchManager = PatchManager();
+	string ipcDir;
+
 	unsigned char* maplestoryCopyBase;
 	char asmBuffer[BUFF_SIZE];
 
@@ -226,6 +233,19 @@ namespace MapleStory {
 		return patchManager.InstallPatch(true, patch);
 	}
 
+	bool GenerateTrainerWaitFile() {
+		/*
+		 * Generate a file to notify the trainer the bypass has completed installing patches
+		 */
+		char fileName[128];
+		sprintf_s(fileName, "%s/NGSBypass%X-3", ipcDir.c_str(), GetCurrentProcessId());
+		printf("Generating IPC file %s\n", fileName);
+		std::filesystem::path path{ fileName };
+		std::ofstream ofs(path);
+		ofs.close();
+		return true;
+	}
+
 	void InstallPatches()
 	{
 		if (!BlackCall::InstallHooks()) {
@@ -250,7 +270,16 @@ namespace MapleStory {
 		InstallNexonAnalyticsLogsPatch(patchManager);
 		InstallGetMachineIdHook(patchManager);
 		InstallCrashReporterPatch(patchManager);
-
 		//InstallUnknownRoutinePatch(patchManager); // heavily virtualized routine; not necessary
+
+		ipcDir = getenv("appdata") + string("/NGSBypass");
+		if (!std::filesystem::exists(ipcDir))
+		{
+			if (!filesystem::create_directory(ipcDir))
+			{
+				printf("Failed to create IPC dir %s\n", ipcDir.c_str());
+			}
+		}
+		GenerateTrainerWaitFile();
 	}
 }

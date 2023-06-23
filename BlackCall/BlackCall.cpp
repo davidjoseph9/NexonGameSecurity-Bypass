@@ -166,7 +166,7 @@ namespace BlackCall {
 	bool InstallBCNtReadVirtualMemoryHook(PatchManager& patchManager) {
 		Patch::PatchManager::Patch patch;
 
-		patch.name = "BCXXX/BlackCipher64/ntdll.NtReadVirtualMemory hook";
+		patch.name = "BCXXX/BlackCall64/ntdll.NtReadVirtualMemory hook";
 		patch.address = (unsigned __int64)GetProcAddress((HMODULE)bcNtdllModuleEntry.modBaseAddr, "NtReadVirtualMemory");
 		if (patch.address == NULL) {
 			printf("Failed to get proc address of NtReadVirtualMemory\n");
@@ -660,7 +660,7 @@ namespace BlackCall {
 		} while ((blackCallCopyAddr == NULL || bcNtdllCopyAddr == NULL) && counter++ < MAX_NTDLLCOPY_WAITTIME * 10);
 
 		if (blackCallCopyAddr == NULL || bcNtdllCopyAddr == NULL) {
-			wprintf(L"Failed retrieving handle of BlackCipher's ntdll copy (BCXXXX.tmp)");
+			wprintf(L"Failed retrieving handle of BlackCall64's ntdll copy (BCXXXX.tmp)");
 			return false;
 		}
 
