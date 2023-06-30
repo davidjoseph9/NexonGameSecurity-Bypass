@@ -233,7 +233,8 @@ namespace BlackCall {
 		jg Exit
         mov r8, 0x%llX
 		sub rax, r8
-		add rax, 0x%llX
+		mov r8, 0x%llX
+		add rax, r8
         mov r8, [rsp+0x20]
         mov [r8], rax
 
@@ -262,7 +263,6 @@ namespace BlackCall {
 			bcNtdllCopyAddr,
 			(unsigned __int64)blackCallModuleEntry.modBaseAddr + bcMemoryCheck1RetOffset
 		);
-
 		patch.patchType = PatchManager::PatchType::HOOK;
 		patch.hookType = PatchManager::HookType::JUMP;
 
@@ -282,7 +282,8 @@ namespace BlackCall {
         jg Exit
         mov r10, 0x%llX
         sub rcx, r10
-        add rcx, 0x%llX
+		mov r10, 0x%llX
+        add rcx, r10
 
 		Exit:
         sub rsp, 0x18
@@ -330,7 +331,8 @@ namespace BlackCall {
         jg Exit
         mov r10, 0x%llX
         sub rdi, r10
-        add rdi, 0x%llX
+		mov r10, 0x%llX
+        add rdi, r10
 
 		Exit:
         movzx ecx, byte ptr [rdi]
@@ -378,7 +380,8 @@ namespace BlackCall {
 		jg Exit
         mov rcx, 0x%llX
 		sub r8, rcx
-		add r8, 0x%llX
+		mov rcx, 0x%llX
+		add r8, rcx
 
 		Exit:
         mov r8d,[r8]

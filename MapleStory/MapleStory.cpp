@@ -20,10 +20,10 @@ HMODULE hKernelbase = NULL;
 
 unsigned __int64 maplestoryBaseAddress = 0;
 
-const unsigned __int64 maplestoryCRCHookAddress = 0x148058E3E;
-const unsigned __int64 maplestoryCRCBypassAddress = 0x14816DDD3;
-const unsigned __int64 maplestoryCRCBypassReturnAddress = 0x147FD865D;
-const unsigned __int64 maplestoryCRCRegionSize = 0xE589000;
+const unsigned __int64 maplestoryCRCHookAddress = 0x1483DB751;
+const unsigned __int64 maplestoryCRCBypassAddress = 0x1483D8128;
+const unsigned __int64 maplestoryCRCBypassReturnAddress = 0x148370831;
+const unsigned __int64 maplestoryCRCRegionSize = 0xE5F0000;
 
 const unsigned __int64 threadIdCheck1PatchAddress = 0x140E0048E;
 const unsigned __int64 threadIdCheck1JmpAddress = 0x140E0064E;
@@ -31,7 +31,7 @@ const unsigned __int64 threadIdCheck1JmpAddress = 0x140E0064E;
 const unsigned __int64 threadIdCheck2PatchAddress = 0x140E0067E;
 const unsigned __int64 threadIdCheck2JmpAddress = 0x140E0083E;
 
-const unsigned __int64 unknownRoutine1Address = 0x141E9F6A0;
+//const unsigned __int64 unknownRoutine1Address = 0x141E9F6A0; heavily virtualized routine GMS 242.1
 
 namespace MapleStory {
 	LPCWSTR MAPLESTORY_PROCESS = L"MapleStory.exe";
@@ -222,7 +222,7 @@ namespace MapleStory {
 
 		return patchManager.InstallPatch(true, patch);
 	}
-
+	/*
 	bool InstallUnknownRoutinePatch(PatchManager& patchManager) {
 		Patch::PatchManager::Patch patch;
 		patch.address = unknownRoutine1Address;
@@ -231,7 +231,7 @@ namespace MapleStory {
 		patch.patchType = Patch::PatchManager::PatchType::WRITE;
 
 		return patchManager.InstallPatch(true, patch);
-	}
+	}*/
 
 	bool GenerateTrainerWaitFile() {
 		/*
@@ -239,6 +239,7 @@ namespace MapleStory {
 		 */
 		char fileName[128];
 		sprintf_s(fileName, "%s/NGSBypass%X-3", ipcDir.c_str(), GetCurrentProcessId());
+		std::remove(fileName); // delete file if exists
 		printf("Generating IPC file %s\n", fileName);
 		std::filesystem::path path{ fileName };
 		std::ofstream ofs(path);

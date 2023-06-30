@@ -1030,8 +1030,8 @@ namespace BlackCipher {
 		 */
 		sprintf_s(ipcFileName, "%s/NGSBypass%X-1.lock", ipcDir.c_str(), processEntry.th32ParentProcessID);
 		printf("Generating IPC file %s\n", ipcFileName);
-
 		std::filesystem::path path{ ipcFileName };
+		std::filesystem::remove(path); // delete file if exist
 		std::ofstream ofs(path);
 
 		char content[64];
