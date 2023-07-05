@@ -368,8 +368,8 @@ namespace MapleStory {
 		InstallNexonAnalyticsLogsPatch(patchManager);
 		InstallGetMachineIdHook(patchManager);
 		InstallCrashReporterPatch(patchManager);
-		InstallNtOpenProcessHook(patchManager);
-		//InstallUnknownRoutinePatch(patchManager); // heavily virtualized routine; not necessary
+		// InstallNtOpenProcessHook(patchManager);
+		// InstallUnknownRoutinePatch(patchManager); // heavily virtualized routine; not necessary
 
 		ipcDir = getenv("appdata") + string("/NGSBypass");
 		if (!std::filesystem::exists(ipcDir))
