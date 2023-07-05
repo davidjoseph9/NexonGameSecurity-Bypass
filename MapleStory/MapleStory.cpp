@@ -17,6 +17,7 @@
 using namespace Patch;
 
 HMODULE hKernelbase = NULL;
+HMODULE hNtdll = NULL;
 
 unsigned __int64 maplestoryBaseAddress = 0;
 
@@ -40,6 +41,7 @@ namespace MapleStory {
 	LPCWSTR CRASH_REPORTER_DLL = L"CrashReporter_64.dll";
 	LPCWSTR NEXON_ANALYTICS_DLL = L"NexonAnalytics64.dll";
 	LPCWSTR KERNELBASE_DLL = L"KERNELBASE.dll";
+	LPCWSTR NTDLL_DLL = L"ntdll.dll";
 
 	PatchManager patchManager = PatchManager();
 	string ipcDir;
@@ -48,7 +50,7 @@ namespace MapleStory {
 	char asmBuffer[BUFF_SIZE];
 
 	unsigned __int64 machineId = 0;
-	
+
 	std::string asmReturnFalse = Patch::unindent(R"(
         xor rax, rax
 		ret
@@ -59,7 +61,8 @@ namespace MapleStory {
 	std::string crcCodeCaveAsm = Patch::unindent(R"(
         mov rdx, 0x%llX
 		sub rsi, rdx
-        add rsi, 0x%llX
+		mov rdx, 0x%llX
+        add rsi, rdx
 		repe movsb
         xor rdx, rdx
 		mov rsi, 0x%llX
@@ -222,6 +225,93 @@ namespace MapleStory {
 
 		return patchManager.InstallPatch(true, patch);
 	}
+	std::string bcNtOpenProcessAsm = Patch::unindent(R"(
+		push rbx
+        push rcx
+        push rdx
+
+        push rsi
+        push rdi
+
+        push r8
+        push r9
+        push r10
+        push r11
+        push r12
+        push r13
+        push r14
+        push r15
+        
+        sub rsp, 0x20
+        
+        mov rcx, [r9]
+        mov rax, 0x%llX
+        call rax
+
+        add rsp, 0x20
+		
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop r11
+        pop r10
+        pop r9
+        pop r8
+		
+		pop rdi
+        pop rsi
+
+        pop rdx
+        pop rcx
+        pop rbx
+
+        test rax, rax
+        jne NtOpenProcess
+		xor rax, rax
+        ret
+
+	    NtOpenProcess:
+        mov r10, rcx
+        mov eax, 0x00000026
+        syscall
+		ret
+	)");
+	bool WINAPI NtOpenProcessHook(DWORD pid) {
+		if (pid == GetCurrentThreadId()) {
+			printf("Allow access to NtOpenProcess for MapleStory 0x%X\n", pid);
+			return true;
+		}
+		else {
+			printf("Denying access to NtOpenProcess for the process 0x%X\n", pid);
+			SetLastError(ERROR_ACCESS_DENIED);
+			return false;
+		}
+	}
+
+	bool InstallNtOpenProcessHook(PatchManager& patchManager) {
+		Patch::PatchManager::Patch patch1;
+
+		patch1.address = (unsigned __int64)GetProcAddress(hNtdll, "NtOpenProcess");
+		if (patch1.address == NULL) {
+			printf("Failed to get proc address of NtOpenProcess\n");
+			return false;
+		}
+
+		sprintf_s(asmBuffer, bcNtOpenProcessAsm.c_str(), &NtOpenProcessHook);
+
+		patch1.patchType = PatchManager::PatchType::HOOK;
+		patch1.hookType = PatchManager::HookType::JUMP;
+		patch1.name = "ntdll.NtOpenProcess hook";
+		patch1.assembly = std::string(asmBuffer);
+		patch1.hookRegister = "rax";
+		patch1.nopCount = 0;
+
+		patchManager.InstallPatch(true, patch1);
+
+		return true;
+	}
+
 	/*
 	bool InstallUnknownRoutinePatch(PatchManager& patchManager) {
 		Patch::PatchManager::Patch patch;
@@ -259,11 +349,18 @@ namespace MapleStory {
 
 		patchManager.Setup();
 
-		hKernelbase = GetModuleHandleW(KERNELBASE_DLL);
-		if (hKernelbase == NULL) {
-			wprintf(L"Could not get handle of the module %s", KERNELBASE_DLL);
+		hNtdll = GetModuleHandleW(NTDLL_DLL);
+		if (hNtdll == NULL) {
+			wprintf(L"Could not get handle of the module %s\n", NTDLL_DLL);
 			return;
 		}
+
+		hKernelbase = GetModuleHandleW(KERNELBASE_DLL);
+		if (hKernelbase == NULL) {
+			wprintf(L"Could not get handle of the module %s\n", KERNELBASE_DLL);
+			return;
+		}
+
 		InstallCrcBypass(patchManager);
 		InstallThreadIdCheckPatch(patchManager);
 
@@ -271,6 +368,7 @@ namespace MapleStory {
 		InstallNexonAnalyticsLogsPatch(patchManager);
 		InstallGetMachineIdHook(patchManager);
 		InstallCrashReporterPatch(patchManager);
+		InstallNtOpenProcessHook(patchManager);
 		//InstallUnknownRoutinePatch(patchManager); // heavily virtualized routine; not necessary
 
 		ipcDir = getenv("appdata") + string("/NGSBypass");

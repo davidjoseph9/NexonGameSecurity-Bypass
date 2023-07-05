@@ -752,12 +752,12 @@ namespace BlackCipher {
 		if (lpme.th32ProcessID == processEntry.th32ProcessID) {
 			blackcipherIterator = blackcipherModuleList.begin();
 			memcpy(&lpme, &blackcipherIterator._Ptr->_Myval, sizeof(MODULEENTRY32W));
-			wprintf(L"[KERNEL32.Module32FirstW] BC pid = %X, name = '%s' \n%s\n", lpme.th32ProcessID, lpme.szModule, lpme.szExePath);
+			//wprintf(L"[KERNEL32.Module32FirstW] BC pid = %X, name = '%s' \n%s\n", lpme.th32ProcessID, lpme.szModule, lpme.szExePath);
 		}
 		else if (lpme.th32ProcessID == processEntry.th32ParentProcessID) {
 			maplestoryIterator = maplestoryModuleList.begin();
 			memcpy(&lpme, &maplestoryIterator._Ptr->_Myval, sizeof(MODULEENTRY32W));
-			wprintf(L"[KERNEL32.Module32FirstW] Maple pid = %X, name = '%s' \n%s\n", lpme.th32ProcessID, lpme.szModule, lpme.szExePath);
+			//wprintf(L"[KERNEL32.Module32FirstW] Maple pid = %X, name = '%s' \n%s\n", lpme.th32ProcessID, lpme.szModule, lpme.szExePath);
 		}
 		return true;
 	}
@@ -842,7 +842,7 @@ namespace BlackCipher {
 				return false;
 			}
 			memcpy(&me, &blackcipherIterator._Ptr->_Myval, sizeof(MODULEENTRY32W));
-			wprintf(L"[KERNEL32.Module32NextW] BC pid = %X, name = '%s' \n%s\n", me.th32ProcessID, me.szModule, me.szExePath);
+			//wprintf(L"[KERNEL32.Module32NextW] BC pid = %X, name = '%s' \n%s\n", me.th32ProcessID, me.szModule, me.szExePath);
 		}
 		else if (me.th32ProcessID == processEntry.th32ParentProcessID) {
 			maplestoryIterator++;
@@ -851,7 +851,7 @@ namespace BlackCipher {
 				return false;
 			}
 			memcpy(&me, &maplestoryIterator._Ptr->_Myval, sizeof(MODULEENTRY32W));
-			wprintf(L"[KERNEL32.Module32NextW] Maple pid = %X, name = '%s' \n%s\n", me.th32ProcessID, me.szModule, me.szExePath);
+			//wprintf(L"[KERNEL32.Module32NextW] Maple pid = %X, name = '%s' \n%s\n", me.th32ProcessID, me.szModule, me.szExePath);
 		}
 		// else { // this should never happen, we filter other processes using NtOpenProcess hook }
 		return true;
