@@ -1,5 +1,5 @@
 #pragma once
 
 namespace MapleStory {
-	void InstallPatches();
+	void Main();
 }

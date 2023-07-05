@@ -34,11 +34,11 @@ bool APIENTRY DllMain(HMODULE hModule, DWORD  dwReason, LPVOID lpReserved) {
 
 		if (Patch::endsWith(moduleFilePath, BLACKCIPHER_PROCESS_NAME)) {
 			SetupConsole(BLACKCIPHER_PROCESS_NAME);
-			CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&BlackCipher::InstallPatches, NULL, 0, NULL);
+			CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&BlackCipher::Main, NULL, 0, NULL);
 		}
 		else if (Patch::endsWith(moduleFilePath, MAPLESTORY_PROCESS_NAME)) {
 			SetupConsole(MAPLESTORY_PROCESS_NAME);
-			CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&MapleStory::InstallPatches, NULL, 0, NULL);
+			CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&MapleStory::Main, NULL, 0, NULL);
 		}
 		DisableThreadLibraryCalls(hModule);
 	}

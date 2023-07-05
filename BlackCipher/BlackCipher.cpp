@@ -994,13 +994,13 @@ namespace BlackCipher {
 
 		if (maplestoryModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, MAPLESTORY) == 0) {
 			memcpy((void*)&maplestoryModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
-			// maplestoryModuleList.push_back(maplestoryModuleEntry);
+			maplestoryModuleList.push_back(maplestoryModuleEntry);
 		}
 
 		do {
 			if (maplestoryModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, MAPLESTORY) == 0) {
 				memcpy((void*)&maplestoryModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
-				// maplestoryModuleList.push_back(maplestoryModuleEntry);
+				maplestoryModuleList.push_back(maplestoryModuleEntry);
 			}
 			else if (blackCallModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, BLACKCALL64) == 0) {
 				memcpy((void*)&blackCallModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
@@ -1231,5 +1231,13 @@ namespace BlackCipher {
 		return true;
 	}
 
+	void Main() {
+		if (!InstallPatches()) {
+			wprintf(L"Failed to install %s patches\n", BLACKCIPHER64);
+			wprintf(L"Terminating the process in 5 seconds...\n");
+			Sleep(5000);
+			TerminateProcess(GetCurrentProcess(), 1);
+		}
+	}
 
 }

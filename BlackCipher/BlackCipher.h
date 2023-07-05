@@ -6,5 +6,5 @@
 using namespace Patch;
 
 namespace BlackCipher {
-	bool InstallPatches();
+	void Main();
 }

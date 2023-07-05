@@ -1,6 +1,6 @@
 #include "../Patch/PatchManager.h"
 #include "../Patch/Patch.h"
-
+#include "BlackCall.h"
 
 #include <string>
 #include <chrono>
@@ -13,6 +13,7 @@
 
 #include <Psapi.h>
 #include <TlHelp32.h>
+
 
 #define ASM_BUFF_SIZE 2048
 #define FILENAME_BUFF_SIZE 2048
@@ -36,6 +37,9 @@ namespace BlackCall {
 
 	HMODULE hMapleStory = NULL;
 	HMODULE hNtdll = NULL;
+
+	unsigned int blackCipherPid = -1;
+
 
 	unsigned __int64 bcAPIOverwriteRoutineOffset = 0x9FE883;
 	unsigned __int64 bcAPIOverwriteRoutineRetOffset = 0x9FE894;
@@ -64,8 +68,6 @@ namespace BlackCall {
 	MODULEENTRY32W bcNtdllModuleEntry;
 	MODULEENTRY32W blackCallModuleEntry;
 	MODULEENTRY32W blackCipherModuleEntry;
-
-	unsigned int blackCipherPid = -1;
 
 	std::string asmReturnFalse = Patch::unindent(R"(
         xor rax, rax

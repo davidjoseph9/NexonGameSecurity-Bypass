@@ -70,11 +70,11 @@ namespace MapleStory {
 	)");
 	
 
-	void InstallCrcBypass(PatchManager& patchManager) {
+	bool InstallCrcBypass(PatchManager& patchManager) {
 		HMODULE hModule = GetModuleHandleW(MAPLESTORY_MODULE);
 		if (hModule == NULL) {
 			wprintf(L"Failed to get a handle of the module %s\n", MAPLESTORY_MODULE);
-			return;
+			return false;
 		}
 		maplestoryBaseAddress = (unsigned __int64)hModule;
 		const unsigned __int64 bytesRead = 0;
@@ -82,7 +82,7 @@ namespace MapleStory {
 		maplestoryCopyBase = (unsigned char*)VirtualAlloc(NULL, maplestoryCRCRegionSize, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 		if (maplestoryCopyBase == NULL) {
 			printf("Failed to allocate buffer for CRC memory region copy\n");
-			return;
+			return false;
 		}
 		memcpy(maplestoryCopyBase, (void*)(maplestoryBaseAddress + 0x1000), maplestoryCRCRegionSize);
 		patchManager.gameCopyAddress = (unsigned __int64)maplestoryCopyBase;
@@ -96,7 +96,9 @@ namespace MapleStory {
 		patch1.address = maplestoryCRCBypassAddress;
 		patch1.nopCount = 2;
 
-		patchManager.InstallPatch(true, patch1);
+		if (!patchManager.InstallPatch(true, patch1)) {
+			return false;
+		}
 
 		Patch::PatchManager::Patch patch2;
 
@@ -106,7 +108,7 @@ namespace MapleStory {
 		patch2.patchType = Patch::PatchManager::PatchType::WRITE;
 		patch2.address = maplestoryCRCHookAddress;
 
-		patchManager.InstallPatch(true, patch2);
+		return patchManager.InstallPatch(true, patch2);
 	}
 
 	std::string getMachineIdHookAsm = R"(mov rax, 0x%llX; jmp rax)";
@@ -126,16 +128,17 @@ namespace MapleStory {
 		return machineId;
 	}
 
-	void InstallGetMachineIdHook(PatchManager& patchManager) {
+	bool InstallGetMachineIdHook(PatchManager& patchManager) {
 		HMODULE hMachineIdLib = GetModuleHandleW(MACHINE_ID_LIB_DLL);
 		if (hMachineIdLib == NULL) {
 			wprintf(L"Cannot get handle of the module %s", MACHINE_ID_LIB_DLL);
-			return;
+			return false;
 		}
 
 		const unsigned __int64 getMachineIdAddress = (unsigned __int64)GetProcAddress(hMachineIdLib, "MIDLib_GetMachineId");
 		if (getMachineIdAddress == NULL) {
 			printf("Failed to patch machine ID, cannot retrieve the address for the procedure MIDLib_GetMachineId");
+			return false;
 		}
 
 		Patch::PatchManager::Patch patch;
@@ -145,7 +148,7 @@ namespace MapleStory {
 		patch.patchType = Patch::PatchManager::PatchType::WRITE;
 		patch.address = getMachineIdAddress;
 
-		patchManager.InstallPatch(true, patch);
+		return patchManager.InstallPatch(true, patch);
 	}
 
 
@@ -278,7 +281,7 @@ namespace MapleStory {
 		ret
 	)");
 	bool WINAPI NtOpenProcessHook(DWORD pid) {
-		if (pid == GetCurrentThreadId()) {
+		if (pid == GetCurrentProcessId()) {
 			printf("Allow access to NtOpenProcess for MapleStory 0x%X\n", pid);
 			return true;
 		}
@@ -337,48 +340,57 @@ namespace MapleStory {
 		return true;
 	}
 
-	void InstallPatches()
+	bool InstallPatches()
 	{
 		if (!BlackCall::InstallHooks()) {
-			wprintf(L"Failed to install %s hooks\n", MAPLESTORY_PROCESS);
-			printf("Terminating the process in 5 seconds...\n");
-			Sleep(5000);
-			TerminateProcess(GetCurrentProcess(), 1);
-			return;
+			MessageBoxW(NULL, L"Failed to install BlackCall64.aes hooks", L"Error", MB_OK | MB_ICONERROR);
+			return false;
 		}
 
 		patchManager.Setup();
 
 		hNtdll = GetModuleHandleW(NTDLL_DLL);
 		if (hNtdll == NULL) {
-			wprintf(L"Could not get handle of the module %s\n", NTDLL_DLL);
-			return;
+			MessageBoxW(NULL, L"Failed to get NTDLL.dll handle", L"Error", MB_OK | MB_ICONERROR);
+			return false;
 		}
 
 		hKernelbase = GetModuleHandleW(KERNELBASE_DLL);
 		if (hKernelbase == NULL) {
-			wprintf(L"Could not get handle of the module %s\n", KERNELBASE_DLL);
-			return;
+			MessageBoxW(NULL, L"Failed to get KERNELBASE.dll handle", L"Error", MB_OK | MB_ICONERROR);
+			return false;
 		}
 
-		InstallCrcBypass(patchManager);
-		InstallThreadIdCheckPatch(patchManager);
+		if (!InstallCrcBypass(patchManager)) {
+			MessageBoxW(NULL, L"Failed to install the CRC bypass", L"Error", MB_OK | MB_ICONERROR);
+			return false;
+		}
 
-		InstallIsDebuggerPresentPatch(patchManager);
-		InstallNexonAnalyticsLogsPatch(patchManager);
-		InstallGetMachineIdHook(patchManager);
-		InstallCrashReporterPatch(patchManager);
-		// InstallNtOpenProcessHook(patchManager);
+		bool success = InstallNtOpenProcessHook(patchManager) &&
+			InstallThreadIdCheckPatch(patchManager) &&
+			InstallIsDebuggerPresentPatch(patchManager) &&
+			InstallNexonAnalyticsLogsPatch(patchManager) &&
+			InstallGetMachineIdHook(patchManager) &&
+			InstallCrashReporterPatch(patchManager);
+
+		if (!success) {
+			MessageBoxW(NULL, L"Failed to install maplestory.exe secondary patches", L"Error", MB_OK | MB_ICONERROR);
+			return false;
+		}
+		
 		// InstallUnknownRoutinePatch(patchManager); // heavily virtualized routine; not necessary
 
 		ipcDir = getenv("appdata") + string("/NGSBypass");
-		if (!std::filesystem::exists(ipcDir))
-		{
-			if (!filesystem::create_directory(ipcDir))
-			{
-				printf("Failed to create IPC dir %s\n", ipcDir.c_str());
-			}
-		}
 		GenerateTrainerWaitFile();
+		return true;
+	}
+
+	void Main() {
+		if (!InstallPatches()) {
+			wprintf(L"Failed to install %s patches\n", MAPLESTORY_PROCESS);
+			wprintf(L"Terminating the process in 5 seconds...\n");
+			Sleep(5000);
+			TerminateProcess(GetCurrentProcess(), 1);
+		}
 	}
 }
