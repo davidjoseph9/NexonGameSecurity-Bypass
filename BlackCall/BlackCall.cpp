@@ -247,7 +247,7 @@ namespace BlackCall {
 		jmp r8
 	)");
 
-	void InstallBCMemoryCheck1Hook(PatchManager& patchManager) {
+	bool InstallBCMemoryCheck1Hook(PatchManager& patchManager) {
 		/*
 		 * Install patch to bypass memory integrity check that
 		 * checks the integrity of the ntdll.dll copy
@@ -272,7 +272,7 @@ namespace BlackCall {
 		patch.hookRegister = "r8";
 		patch.nopCount = 0;
 
-		patchManager.InstallPatch(true, patch);
+		return patchManager.InstallPatch(true, patch);
 	}
 
 	std::string bcMemoryCheck2Asm = Patch::unindent(R"(
@@ -296,7 +296,7 @@ namespace BlackCall {
 		jmp r10
 	)");
 
-	void InstallBCMemoryCheck2Hook(PatchManager& patchManager) {
+	bool InstallBCMemoryCheck2Hook(PatchManager& patchManager) {
 		/*
 		 * Install patch to bypass memory integrity check that 
 		 * checks the integrity of the ntdll.dll copy
@@ -321,7 +321,7 @@ namespace BlackCall {
 		patch.hookRegister = "r10";
 		patch.nopCount = 0;
 
-		patchManager.InstallPatch(true, patch);
+		return patchManager.InstallPatch(true, patch);
 	}
 
 	std::string bcMemoryCheck3Asm = Patch::unindent(R"(
@@ -344,7 +344,7 @@ namespace BlackCall {
 		jmp r10
 	)");
 
-	void InstallBCMemoryCheck3Hook(PatchManager& patchManager) {
+	bool InstallBCMemoryCheck3Hook(PatchManager& patchManager) {
 		/*
 		 * Install patch to bypass memory integrity check that reads
 		 * the memory of a subset of methods in the BlackCall64.aes module
@@ -370,7 +370,7 @@ namespace BlackCall {
 		patch.hookRegister = "r10";
 		patch.nopCount = 0;
 
-		patchManager.InstallPatch(true, patch);
+		return patchManager.InstallPatch(true, patch);
 	}
 
 	std::string bcMemoryCheck4Asm = Patch::unindent(R"(
@@ -393,7 +393,7 @@ namespace BlackCall {
 	    jmp rcx
 	)");
 
-	void InstallBCMemoryCheck4Hook(PatchManager& patchManager) {
+	bool InstallBCMemoryCheck4Hook(PatchManager& patchManager) {
 		/*
 		 * Install patch to bypass memory integrity check that reads 
 		 * the memory of a subset of methods in the BlackCall64.aes module
@@ -418,7 +418,7 @@ namespace BlackCall {
 		patch.hookRegister = "rcx";
 		patch.nopCount = 0;
 
-		patchManager.InstallPatch(true, patch);
+		return patchManager.InstallPatch(true, patch);
 	}
 
 	bool InstallDebuggerCheckPatches(PatchManager& patchManager) {
@@ -623,7 +623,7 @@ namespace BlackCall {
 		return true;
 	}
 
-	bool InstallHooks() {
+	bool InstallPatches() {
 		/*
 		 * Install patches related to the BlackCall64.aes module
 		 */
@@ -678,12 +678,19 @@ namespace BlackCall {
 
 		InstallAPIRestoreRoutinePatch(patchManager);
 
-		InstallBCMemoryCheck1Hook(patchManager);
-		InstallBCMemoryCheck2Hook(patchManager);
-		InstallBCMemoryCheck3Hook(patchManager);
-		InstallBCMemoryCheck4Hook(patchManager);
+		bool success = InstallBCMemoryCheck1Hook(patchManager) &&
+			InstallBCMemoryCheck2Hook(patchManager) &&
+			InstallBCMemoryCheck3Hook(patchManager) &&
+			InstallBCMemoryCheck4Hook(patchManager);
 
-		InstallBCNtReadVirtualMemoryHook(patchManager);
+		if (!success) {
+			printf("Failed to install BlackCall64 memory integrity check patches\n");
+			return false;
+		}
+
+		if (!InstallBCNtReadVirtualMemoryHook(patchManager)) {
+			return false;
+		}
 
 		InstallDebuggerCheckPatches(patchManager);
 

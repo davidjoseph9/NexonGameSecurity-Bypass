@@ -342,8 +342,8 @@ namespace MapleStory {
 
 	bool InstallPatches()
 	{
-		if (!BlackCall::InstallHooks()) {
-			MessageBoxW(NULL, L"Failed to install BlackCall64.aes hooks", L"Error", MB_OK | MB_ICONERROR);
+		if (!BlackCall::InstallPatches()) {
+			MessageBoxW(NULL, L"Failed to install BlackCall64.aes patches", L"Error", MB_OK | MB_ICONERROR);
 			return false;
 		}
 
@@ -366,7 +366,7 @@ namespace MapleStory {
 			return false;
 		}
 
-		bool success = InstallNtOpenProcessHook(patchManager) &&
+		bool success = //InstallNtOpenProcessHook(patchManager) &&
 			InstallThreadIdCheckPatch(patchManager) &&
 			InstallIsDebuggerPresentPatch(patchManager) &&
 			InstallNexonAnalyticsLogsPatch(patchManager) &&

@@ -3,5 +3,5 @@
 
 
 namespace BlackCall {
-	bool InstallHooks();
+	bool InstallPatches();
 }
