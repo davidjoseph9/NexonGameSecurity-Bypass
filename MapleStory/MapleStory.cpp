@@ -326,7 +326,7 @@ namespace MapleStory {
 			return false;
 		}
 
-		patch1.address += 0x8; // probably not necessary
+		patch1.address += 0x8;
 
 		sprintf_s(asmBuffer, bcNtOpenProcessAsm.c_str(), &NtOpenProcessHook);
 
@@ -409,7 +409,7 @@ namespace MapleStory {
 				return false;
 			}
 			Sleep(50);
-		} while (counter++ < MAX_DLL_WAITTIME * 10);
+		} while (!bcfound && counter++ < MAX_DLL_WAITTIME * 20);
 
 		CloseHandle(hProcessSnapShot);
 
@@ -428,7 +428,7 @@ namespace MapleStory {
 			MessageBoxW(NULL, L"Failed to install the CRC bypass", L"Error", MB_OK | MB_ICONERROR);
 			return false;
 		}
-
+		
 		bool success = InstallThreadIdCheckPatch(patchManager) &&
 			InstallIsDebuggerPresentPatch(patchManager) &&
 			InstallNexonAnalyticsLogsPatch(patchManager) &&
