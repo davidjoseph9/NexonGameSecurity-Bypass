@@ -421,35 +421,6 @@ namespace BlackCall {
 		return patchManager.InstallPatch(true, patch);
 	}
 
-	bool InstallDebuggerCheckPatches(PatchManager& patchManager) {
-		/*
-		 * Installs patches to bypass debugger checks that use a combination 
-		 * of KERNELBASE.RaiseException, VirtualUnwindEx, RtlCaptureContext2
-		 */ 
-		Patch::PatchManager::Patch patch;
-		
-		patch.name = "BlackCall64.aes Debugger check 1";
-		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcDebuggerCheck1Offset;
-		patch.patchType = Patch::PatchManager::PatchType::WRITE;
-		sprintf_s(asmBuffer, asmReturnFalse.c_str());
-		patch.assembly = std::string(asmBuffer);
-
-		patch.name = "BlackCall64.aes Debugger check 2";
-		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcDebuggerCheck2Offset;
-		patch.patchType = Patch::PatchManager::PatchType::WRITE;
-		sprintf_s(asmBuffer, asmReturnFalse.c_str());
-		patch.assembly = std::string(asmBuffer);
-
-		patch.name = "BlackCall64.aes Debugger check 3";
-		patch.address = (unsigned __int64)blackCallModuleEntry.modBaseAddr + bcDebuggerCheck3Offset;
-		patch.patchType = Patch::PatchManager::PatchType::WRITE;
-		sprintf_s(asmBuffer, asmReturnFalse.c_str());
-		patch.assembly = std::string(asmBuffer);
-
-		return patchManager.InstallPatch(true, patch) &&
-			patchManager.InstallPatch(true, patch) &&
-			patchManager.InstallPatch(true, patch);
-	}
 	void LoadMapleStoryModules() {
 		/*
 		 * Load modules loaded in the MapleStory.exe process and add them to a list
@@ -576,7 +547,7 @@ namespace BlackCall {
 				else if (keyValuePair[0].compare("pid") == 0) {
 					std::stringstream ss;
 					ss << std::hex << (const char*)keyValuePair[1].c_str() + 2;
-					ss >> *blackCipherPid;
+		   			ss >> *blackCipherPid;
 					printf("BlackCipher PID 0x%X\n", *blackCipherPid);
 				}
 			}
@@ -693,7 +664,7 @@ namespace BlackCall {
 			return false;
 		}
 
-		InstallDebuggerCheckPatches(patchManager);
+		//InstallDebuggerCheckPatches(patchManager);
 
 		ResumeProcessThreads(threadId);
 
