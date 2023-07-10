@@ -169,7 +169,6 @@
     <ClInclude Include="BlackCipher\BlackCipher.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="MapleStory\MapleStory.h" />
-    <ClInclude Include="NexonLauncher\NexonLauncher.h" />
     <ClInclude Include="Patch\Patch.h" />
     <ClInclude Include="Patch\PatchManager.h" />
   </ItemGroup>
@@ -178,7 +177,6 @@
     <ClCompile Include="BlackCipher\BlackCipher.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="MapleStory\MapleStory.cpp" />
-    <ClCompile Include="NexonLauncher\NexonLauncher.cpp" />
     <ClCompile Include="Patch\PatchManager.cpp" />
     <ClCompile Include="Patch\Patch.cpp" />
   </ItemGroup>

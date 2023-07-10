@@ -1216,7 +1216,7 @@ namespace BlackCipher {
 
 		success = InstallBCNtReadVirtualMemoryHook(patchManager) &&
 			InstallBCNtOpenProcessHook(patchManager) &&
-			InstallBCNtQuerySystemInformationHook(patchManager);//&&
+			InstallBCNtQuerySystemInformationHook(patchManager);
 			//InstallBCNtQueryVirtualMemoryHook(patchManager); not required and implementation removed
 
 		if (!success) {

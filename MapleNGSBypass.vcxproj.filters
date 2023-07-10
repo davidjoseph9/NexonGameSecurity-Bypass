@@ -22,9 +22,6 @@
     <Filter Include="Source Files\BlackCall">
       <UniqueIdentifier>{5a6385f9-be90-4ed9-aec0-6c643e5fbc9f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\NexonLauncher">
-      <UniqueIdentifier>{05a3e26d-87c6-4f8b-91b4-8edb85acbbcf}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Patch">
       <UniqueIdentifier>{8d2e4945-2312-492b-bf0e-3efd044e8fc8}</UniqueIdentifier>
     </Filter>
@@ -48,9 +45,6 @@
     <ClInclude Include="BlackCall\BlackCall.h">
       <Filter>Source Files\BlackCall</Filter>
     </ClInclude>
-    <ClInclude Include="NexonLauncher\NexonLauncher.h">
-      <Filter>Source Files\NexonLauncher</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -70,9 +64,6 @@
     </ClCompile>
     <ClCompile Include="BlackCall\BlackCall.cpp">
       <Filter>Source Files\BlackCall</Filter>
-    </ClCompile>
-    <ClCompile Include="NexonLauncher\NexonLauncher.cpp">
-      <Filter>Source Files\NexonLauncher</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

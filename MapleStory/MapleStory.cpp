@@ -293,7 +293,6 @@ namespace MapleStory {
 			printf("Allow access to NtOpenProcess for process 0x%X. MapleStory, BlackCipher64.aes, and system idle\n", pid);
 			if (!dllsInjected && pid == blackCipherPid) {
 				dllsInjected = true;
-				printf("Injecting DLLS NtOpenProcessHook\n");
 				std::filesystem::path bypassDllPath = std::filesystem::path(currentModulePath);
 				wchar_t buff[256];
 				wsprintf(buff, L"%s/%s", (wchar_t*)bypassDllPath.parent_path().c_str(), KEYSTONE_DLL);
@@ -303,13 +302,11 @@ namespace MapleStory {
 					wprintf(L"Failed to inject %s\n", (wchar_t*)keystoneDllPath.c_str());
 					return true;
 				}
-				printf("Injecting DLLS NtOpenProcessHook1\n");
 				wprintf((wchar_t*)bypassDllPath.c_str());
 				if (!Patch::InjectDll(pid, (wchar_t*)bypassDllPath.c_str())) {
 					wprintf(L"Failed to inject %s\n", (wchar_t*)keystoneDllPath.c_str());
 					return true;
 				}
-				printf("Injecting DLLS NtOpenProcessHook2\n");
 			}
 			return true;
 		}
@@ -419,8 +416,6 @@ namespace MapleStory {
 		if (!bcfound) {
 			return false;
 		}
-
-		printf("BLACKCIPHER PID 0x%X", blackCipherPid);
 
 		if (!BlackCall::InstallPatches(&blackCipherPid)) {
 			MessageBoxW(NULL, L"Failed to install BlackCall64.aes patches", L"Error", MB_OK | MB_ICONERROR);
