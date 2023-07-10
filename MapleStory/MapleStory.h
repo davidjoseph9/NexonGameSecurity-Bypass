@@ -1,5 +1,5 @@
 #pragma once
 
 namespace MapleStory {
-	void Main();
+	void Main(HMODULE& hModule);
 }

@@ -71,8 +71,8 @@ namespace Patch {
 			return NULL;
 		}
 
-		const unsigned __int64 bytesRead = 0;
-		bool result = ReadProcessMemory(hProcess, (LPCVOID)startAddress, (LPVOID)copyAddress, size, bytesRead);
+		SIZE_T bytesRead = 0;
+		bool result = ReadProcessMemory(hProcess, (LPCVOID)startAddress, (LPVOID)copyAddress, size, &bytesRead);
 		if (!result) return NULL;
 		return copyAddress;
 	}
@@ -134,13 +134,40 @@ namespace Patch {
 	{
 		HANDLE processHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
 
-		NtSuspendProcess pfnNtSuspendProcess = (NtSuspendProcess)GetProcAddress(
+		NtSuspendProcess ntSuspendProcess = (NtSuspendProcess)GetProcAddress(
 			GetModuleHandleA("ntdll.dll"), "NtSuspendProcess");
-		if (pfnNtSuspendProcess == NULL) {
+		if (ntSuspendProcess == NULL) {
 			printf("Failed to get NtSuspendProcess procedure");
 		}
-		pfnNtSuspendProcess(processHandle);
+		ntSuspendProcess(processHandle);
 		CloseHandle(processHandle);
+	}
+
+	bool InjectDll(DWORD pid, wchar_t* modulePath)
+	{
+		HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+		if (hProcess != INVALID_HANDLE_VALUE)
+		{
+			unsigned __int64 _LoadLibraryW = (unsigned __int64)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryW");
+			if (_LoadLibraryW == NULL) {
+				return false;
+			}
+			void* allocation = VirtualAllocEx(hProcess, NULL,  (2 * lstrlenW(modulePath)) + 1, MEM_COMMIT, PAGE_READWRITE);
+			if (allocation == NULL) {
+				return false;
+			}
+			WriteProcessMemory(hProcess, allocation, modulePath, (2 * lstrlenW(modulePath)) + 1, NULL);
+			HANDLE hThread = CreateRemoteThread(hProcess, NULL, 0, LPTHREAD_START_ROUTINE(_LoadLibraryW), allocation, 0, NULL);
+			if (hThread == NULL) {
+				return false;
+			}
+			WaitForSingleObject(hThread, INFINITE);
+			VirtualFreeEx(hProcess, allocation, NULL, MEM_RELEASE);
+			CloseHandle(hThread);
+			return true;
+		}
+
+		return false;
 	}
 
 	PROCESSENTRY32W GetChildProcessEntry(DWORD parentPID, LPCWSTR processName) {

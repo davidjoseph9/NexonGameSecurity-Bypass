@@ -30,7 +30,7 @@ namespace BlackCipher {
 	LPCWSTR KERNEL32_DLL = L"KERNEL32.DLL";
 
 	unsigned int MAX_IPC_FILE_WAITTIME = 60; // secs to wait for IPC file created by BlackCipher64 process
-	unsigned int MAX_NTDLLCOPY_WAITTIME = 30; // secs to wait for ntdll copy module to load
+	unsigned int MAX_NTDLLCOPY_WAITTIME = 60; // secs to wait for ntdll copy module to load
 
 	PatchManager patchManager = Patch::PatchManager();
 
@@ -994,13 +994,13 @@ namespace BlackCipher {
 
 		if (maplestoryModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, MAPLESTORY) == 0) {
 			memcpy((void*)&maplestoryModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
-			maplestoryModuleList.push_back(maplestoryModuleEntry);
+			//maplestoryModuleList.push_back(maplestoryModuleEntry);
 		}
 
 		do {
 			if (maplestoryModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, MAPLESTORY) == 0) {
 				memcpy((void*)&maplestoryModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));
-				maplestoryModuleList.push_back(maplestoryModuleEntry);
+				//maplestoryModuleList.push_back(maplestoryModuleEntry);
 			}
 			else if (blackCallModuleEntry.hModule == NULL && lstrcmpW(moduleEntry.szModule, BLACKCALL64) == 0) {
 				memcpy((void*)&blackCallModuleEntry, (void*)&moduleEntry, sizeof(MODULEENTRY32W));

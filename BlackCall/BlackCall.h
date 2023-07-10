@@ -3,5 +3,5 @@
 
 
 namespace BlackCall {
-	bool InstallPatches();
+	bool InstallPatches(unsigned int* bcPid);
 }

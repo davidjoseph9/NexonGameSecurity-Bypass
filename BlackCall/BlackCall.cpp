@@ -38,7 +38,7 @@ namespace BlackCall {
 	HMODULE hMapleStory = NULL;
 	HMODULE hNtdll = NULL;
 
-	unsigned int blackCipherPid = -1;
+	unsigned int* blackCipherPid = NULL;
 
 
 	unsigned __int64 bcAPIOverwriteRoutineOffset = 0x9FE883;
@@ -151,7 +151,7 @@ namespace BlackCall {
 				return -1;
 			}
 		}
-		else if (targetPid == blackCipherPid) {
+		else if (targetPid == *blackCipherPid) {
 			if (lpBaseAddress >= blackCipherModuleEntry.modBaseAddr &&
 				lpBaseAddress <= blackCipherModuleEntry.modBaseAddr + blackCipherModuleEntry.modBaseSize) {
 
@@ -500,7 +500,7 @@ namespace BlackCall {
 		 * can later be used in the NtReadVirtualMemory hook to bypass the security modules
 		 * integrity checks
 		 */
-		HANDLE hModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, blackCipherPid);
+		HANDLE hModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, *blackCipherPid);
 
 		MODULEENTRY32W moduleEntry;
 		moduleEntry.dwSize = sizeof(MODULEENTRY32W);
@@ -576,8 +576,8 @@ namespace BlackCall {
 				else if (keyValuePair[0].compare("pid") == 0) {
 					std::stringstream ss;
 					ss << std::hex << (const char*)keyValuePair[1].c_str() + 2;
-					ss >> blackCipherPid;
-					printf("BlackCipher PID 0x%X\n", blackCipherPid);
+					ss >> *blackCipherPid;
+					printf("BlackCipher PID 0x%X\n", *blackCipherPid);
 				}
 			}
 
@@ -623,10 +623,11 @@ namespace BlackCall {
 		return true;
 	}
 
-	bool InstallPatches() {
+	bool InstallPatches(unsigned int* bcPid) {
 		/*
 		 * Install patches related to the BlackCall64.aes module
 		 */
+		blackCipherPid = bcPid;
 		patchManager.Setup();
 
 		hMapleStory = GetModuleHandleW(MAPLESTORY_MODULE);

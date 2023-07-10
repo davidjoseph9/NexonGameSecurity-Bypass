@@ -72,4 +72,5 @@ namespace Patch {
 	MODULEENTRY32W GetModuleEntry(DWORD processId, LPWSTR moduleName);
 	string ReadTextFile(std::string path);
 	vector<string> Split(const char* str, char c);
+    bool InjectDll(DWORD pid, wchar_t* modulePath);
 }

@@ -1,4 +1,4 @@
-#include "../Patch/Patch.h"
+	#include "../Patch/Patch.h"
 #include "../Patch/PatchManager.h"
 #include "../MapleStory/MapleStory.h"
 #include "../BlackCall/BlackCall.h"
@@ -19,6 +19,10 @@ using namespace Patch;
 HMODULE hKernelbase = NULL;
 HMODULE hNtdll = NULL;
 
+char currentModulePath[MAX_PATH];
+
+unsigned int blackCipherPid = -1;
+
 unsigned __int64 maplestoryBaseAddress = 0;
 
 const unsigned __int64 maplestoryCRCHookAddress = 0x1483DB751;
@@ -37,14 +41,19 @@ const unsigned __int64 threadIdCheck2JmpAddress = 0x140E0083E;
 namespace MapleStory {
 	LPCWSTR MAPLESTORY_PROCESS = L"MapleStory.exe";
 	LPCWSTR MAPLESTORY_MODULE = L"maplestory.exe";
+	LPCWSTR BLACKCIPHER64 = L"BlackCipher64.aes";
 	LPCWSTR MACHINE_ID_LIB_DLL = L"MachineIdLib.dll";
 	LPCWSTR CRASH_REPORTER_DLL = L"CrashReporter_64.dll";
 	LPCWSTR NEXON_ANALYTICS_DLL = L"NexonAnalytics64.dll";
 	LPCWSTR KERNELBASE_DLL = L"KERNELBASE.dll";
 	LPCWSTR NTDLL_DLL = L"ntdll.dll";
+	LPCWSTR KEYSTONE_DLL = L"keystone.dll";
+
+	unsigned int MAX_DLL_WAITTIME = 60; // secs to wait for ntdll copy module to load
 
 	PatchManager patchManager = PatchManager();
 	string ipcDir;
+	bool dllsInjected = false;
 
 	unsigned char* maplestoryCopyBase;
 	char asmBuffer[BUFF_SIZE];
@@ -94,7 +103,6 @@ namespace MapleStory {
 		patch1.assembly = std::string(asmBuffer);
 		patch1.patchType = Patch::PatchManager::PatchType::WRITE;
 		patch1.address = maplestoryCRCBypassAddress;
-		patch1.nopCount = 2;
 
 		if (!patchManager.InstallPatch(true, patch1)) {
 			return false;
@@ -281,8 +289,28 @@ namespace MapleStory {
 		ret
 	)");
 	bool WINAPI NtOpenProcessHook(DWORD pid) {
-		if (pid == GetCurrentProcessId()) {
-			printf("Allow access to NtOpenProcess for MapleStory 0x%X\n", pid);
+		if (pid == 0 || pid == GetCurrentProcessId() || pid == blackCipherPid) {
+			printf("Allow access to NtOpenProcess for process 0x%X. MapleStory, BlackCipher64.aes, and system idle\n", pid);
+			if (!dllsInjected && pid == blackCipherPid) {
+				dllsInjected = true;
+				printf("Injecting DLLS NtOpenProcessHook\n");
+				std::filesystem::path bypassDllPath = std::filesystem::path(currentModulePath);
+				wchar_t buff[256];
+				wsprintf(buff, L"%s/%s", (wchar_t*)bypassDllPath.parent_path().c_str(), KEYSTONE_DLL);
+				std::filesystem::path keystoneDllPath = std::filesystem::path(buff);
+				wprintf((wchar_t*)keystoneDllPath.c_str());
+				if (!Patch::InjectDll(pid, (wchar_t*)keystoneDllPath.c_str())) {
+					wprintf(L"Failed to inject %s\n", (wchar_t*)keystoneDllPath.c_str());
+					return true;
+				}
+				printf("Injecting DLLS NtOpenProcessHook1\n");
+				wprintf((wchar_t*)bypassDllPath.c_str());
+				if (!Patch::InjectDll(pid, (wchar_t*)bypassDllPath.c_str())) {
+					wprintf(L"Failed to inject %s\n", (wchar_t*)keystoneDllPath.c_str());
+					return true;
+				}
+				printf("Injecting DLLS NtOpenProcessHook2\n");
+			}
 			return true;
 		}
 		else {
@@ -300,6 +328,8 @@ namespace MapleStory {
 			printf("Failed to get proc address of NtOpenProcess\n");
 			return false;
 		}
+
+		patch1.address += 0x8; // probably not necessary
 
 		sprintf_s(asmBuffer, bcNtOpenProcessAsm.c_str(), &NtOpenProcessHook);
 
@@ -342,11 +372,6 @@ namespace MapleStory {
 
 	bool InstallPatches()
 	{
-		if (!BlackCall::InstallPatches()) {
-			MessageBoxW(NULL, L"Failed to install BlackCall64.aes patches", L"Error", MB_OK | MB_ICONERROR);
-			return false;
-		}
-
 		patchManager.Setup();
 
 		hNtdll = GetModuleHandleW(NTDLL_DLL);
@@ -361,13 +386,55 @@ namespace MapleStory {
 			return false;
 		}
 
+		if (!InstallNtOpenProcessHook(patchManager)) {
+			MessageBoxW(NULL, L"Failed to install NtOpenProcess patches", L"Error", MB_OK | MB_ICONERROR);
+			return false;
+		}
+
+		HANDLE hProcessSnapShot = NULL;
+		unsigned int counter = 0;
+		bool bcfound = false;
+		do {
+			hProcessSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+			PROCESSENTRY32W pe;
+			pe.dwSize = sizeof(PROCESSENTRY32W);
+			if (Process32FirstW(hProcessSnapShot, &pe)) {
+				do {
+					if (endsWithW(pe.szExeFile, BLACKCIPHER64)) {
+						blackCipherPid = pe.th32ProcessID;
+						bcfound = true;
+						break;
+					}
+				} while (Process32NextW(hProcessSnapShot, &pe));
+			}
+			else {
+				wprintf(L"[Process32NextW] Failed to get information on the process %s\n", BLACKCIPHER64);
+				return false;
+			}
+			Sleep(50);
+		} while (counter++ < MAX_DLL_WAITTIME * 10);
+
+		CloseHandle(hProcessSnapShot);
+
+		if (!bcfound) {
+			return false;
+		}
+
+		printf("BLACKCIPHER PID 0x%X", blackCipherPid);
+
+		if (!BlackCall::InstallPatches(&blackCipherPid)) {
+			MessageBoxW(NULL, L"Failed to install BlackCall64.aes patches", L"Error", MB_OK | MB_ICONERROR);
+			return false;
+		}
+
+		patchManager.Setup();
+
 		if (!InstallCrcBypass(patchManager)) {
 			MessageBoxW(NULL, L"Failed to install the CRC bypass", L"Error", MB_OK | MB_ICONERROR);
 			return false;
 		}
 
-		bool success = //InstallNtOpenProcessHook(patchManager) &&
-			InstallThreadIdCheckPatch(patchManager) &&
+		bool success = InstallThreadIdCheckPatch(patchManager) &&
 			InstallIsDebuggerPresentPatch(patchManager) &&
 			InstallNexonAnalyticsLogsPatch(patchManager) &&
 			InstallGetMachineIdHook(patchManager) &&
@@ -385,12 +452,16 @@ namespace MapleStory {
 		return true;
 	}
 
-	void Main() {
-		if (!InstallPatches()) {
-			wprintf(L"Failed to install %s patches\n", MAPLESTORY_PROCESS);
-			wprintf(L"Terminating the process in 5 seconds...\n");
-			Sleep(5000);
-			TerminateProcess(GetCurrentProcess(), 1);
+	void Main(HMODULE& hModule) {
+		int length = GetModuleFileNameA(hModule, currentModulePath, MAX_PATH);
+		if (length) {
+			if (InstallPatches()) {
+				return;
+			}
 		}
+		wprintf(L"Failed to install %s patches\n", MAPLESTORY_PROCESS);
+		wprintf(L"Terminating the process in 5 seconds...\n");
+		Sleep(5000);
+		TerminateProcess(GetCurrentProcess(), 1);
 	}
 }
