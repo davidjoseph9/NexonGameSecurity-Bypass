@@ -304,7 +304,7 @@ namespace MapleStory {
 				}
 				wprintf((wchar_t*)bypassDllPath.c_str());
 				if (!Patch::InjectDll(pid, (wchar_t*)bypassDllPath.c_str())) {
-					wprintf(L"Failed to inject %s\n", (wchar_t*)keystoneDllPath.c_str());
+					wprintf(L"Failed to inject %s\n", (wchar_t*)bypassDllPath.c_str());
 					return true;
 				}
 			}
