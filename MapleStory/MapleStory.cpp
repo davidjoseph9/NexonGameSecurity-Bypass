@@ -30,6 +30,8 @@ const unsigned __int64 maplestoryCRCBypassAddress = 0x1483D8128;
 const unsigned __int64 maplestoryCRCBypassReturnAddress = 0x148370831;
 const unsigned __int64 maplestoryCRCRegionSize = 0xE5F0000;
 
+const unsigned __int64 processLoggingReturnAddress = 0x140E232D0;
+
 const unsigned __int64 threadIdCheck1PatchAddress = 0x140E0048E;
 const unsigned __int64 threadIdCheck1JmpAddress = 0x140E0064E;
 
@@ -237,6 +239,9 @@ namespace MapleStory {
 		return patchManager.InstallPatch(true, patch);
 	}
 	std::string bcNtOpenProcessAsm = Patch::unindent(R"(
+		mov rax, 0x%llX
+	    cmp [rsp+0x70], rax
+		jne NtOpenProcess
 		push rbx
         push rcx
         push rdx
@@ -328,7 +333,7 @@ namespace MapleStory {
 
 		patch1.address += 0x8;
 
-		sprintf_s(asmBuffer, bcNtOpenProcessAsm.c_str(), &NtOpenProcessHook);
+		sprintf_s(asmBuffer, bcNtOpenProcessAsm.c_str(), processLoggingReturnAddress, &NtOpenProcessHook);
 
 		patch1.patchType = PatchManager::PatchType::HOOK;
 		patch1.hookType = PatchManager::HookType::JUMP;

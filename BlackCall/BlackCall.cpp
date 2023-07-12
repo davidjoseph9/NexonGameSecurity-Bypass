@@ -628,8 +628,6 @@ namespace BlackCall {
 			return false;
 		}
 
-		Sleep(5000);
-
 		unsigned int counter = 0;
 		do {
 			LoadMapleStoryModules();
