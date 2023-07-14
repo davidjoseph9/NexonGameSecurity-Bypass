@@ -350,7 +350,7 @@ namespace BlackCipher {
 		xor rax, rax
         ret
 	)");
-	NTSTATUS WINAPI NtQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass,
+	NTSTATUS WINAPI NtQuerySystemInformation(Patch::SYSTEM_INFORMATION_CLASS SystemInformationClass,
 			PVOID SystemInformation, ULONG SystemInformationLength, PULONG ReturnLength) {
 		wprintf(L"[BCXXXX/NTDLL.NtQuerySystemInformation] SystemInformationClass = 0x%X\n", SystemInformationClass);
 		memset(SystemInformation, 0, SystemInformationLength);
@@ -652,7 +652,8 @@ namespace BlackCipher {
         jg Exit
         mov r11, 0x%llX
         sub rcx, r11
-        add rcx, 0x%llX
+		mov r11, 0x%llX
+        add rcx, r11
 
 		Exit:
         mov ecx, [rcx]

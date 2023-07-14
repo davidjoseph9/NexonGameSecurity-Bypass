@@ -4,6 +4,7 @@
 #include <vector>
 #include <windows.h>
 #include <TlHelp32.h>
+#include <winternl.h>
 
 #define STATUS_ACCESS_DENIED 0xC0000022
 
@@ -60,6 +61,14 @@ namespace Patch {
         SystemLookasideInformation
     } SYSTEM_INFORMATION_CLASS, * PSYSTEM_INFORMATION_CLASS;
 
+    typedef struct _CLIENT_ID
+    {
+        PVOID UniqueProcess;
+        PVOID UniqueThread;
+    } CLIENT_ID, * PCLIENT_ID;
+
+    typedef OBJECT_ATTRIBUTES* POBJECT_ATTRIBUTES;
+
 	bool endsWith(string const& fullString, string const& ending);
 	bool endsWithW(wstring const& fullString, wstring const& ending);
 	string unindent(const char* p);
@@ -73,4 +82,5 @@ namespace Patch {
 	string ReadTextFile(std::string path);
 	vector<string> Split(const char* str, char c);
     bool InjectDll(DWORD pid, wchar_t* modulePath);
+    void HexToBytes(const char* src, unsigned char* target);
 }

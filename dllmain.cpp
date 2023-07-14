@@ -38,7 +38,7 @@ bool APIENTRY DllMain(HMODULE hModule, DWORD  dwReason, LPVOID lpReserved) {
 		}
 		else if (Patch::endsWith(moduleFilePath, MAPLESTORY_PROCESS_NAME)) {
 			SetupConsole(MAPLESTORY_PROCESS_NAME);
-			CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&MapleStory::Main, &hModule, 0, NULL);
+			CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&MapleStory::Main, hModule, 0, NULL);
 		}
 		DisableThreadLibraryCalls(hModule);
 	}

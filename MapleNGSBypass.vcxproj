@@ -143,10 +143,11 @@
       <ConformanceMode>false</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>C:\Users\david\OneDrive\Desktop\Jinja2C++\Installed\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\david\OneDrive\Desktop\yaml-cpp-yaml-cpp-0.7.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <EnableModules>false</EnableModules>
-      <AdditionalModuleDependencies>C:\Users\david\OneDrive\Desktop\Jinja2C++\Installed;%(AdditionalModuleDependencies)</AdditionalModuleDependencies>
+      <AdditionalModuleDependencies>
+      </AdditionalModuleDependencies>
       <CompileAsManaged>true</CompileAsManaged>
       <ExceptionHandling>false</ExceptionHandling>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -157,8 +158,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>C:\Users\david\OneDrive\Desktop\yaml-cpp-yaml-cpp-0.7.0\Release\yaml-cpp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\david\OneDrive\Desktop\yaml-cpp-yaml-cpp-0.7.0\Release\yaml-cpp.lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>

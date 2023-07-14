@@ -1,4 +1,4 @@
-	#include "../Patch/Patch.h"
+#include "../Patch/Patch.h"
 #include "../Patch/PatchManager.h"
 #include "../MapleStory/MapleStory.h"
 #include "../BlackCall/BlackCall.h"
@@ -11,6 +11,9 @@
 #include <sstream>
 #include <chrono>
 #include <filesystem>
+#include <iphlpapi.h>
+#include <winternl.h>
+#include <yaml-cpp/yaml.h>
 
 #define BUFF_SIZE 2048
 
@@ -18,8 +21,12 @@ using namespace Patch;
 
 HMODULE hKernelbase = NULL;
 HMODULE hNtdll = NULL;
+HMODULE hIPHLPAPI = NULL;
+HMODULE hNetapi32 = NULL;
 
 char currentModulePath[MAX_PATH];
+wchar_t msgBoxBuf[255];
+char patchNameBuf[255];
 
 unsigned int blackCipherPid = -1;
 
@@ -38,7 +45,15 @@ const unsigned __int64 threadIdCheck1JmpAddress = 0x140E0064E;
 const unsigned __int64 threadIdCheck2PatchAddress = 0x140E0067E;
 const unsigned __int64 threadIdCheck2JmpAddress = 0x140E0083E;
 
-//const unsigned __int64 unknownRoutine1Address = 0x141E9F6A0; heavily virtualized routine GMS 242.1
+unsigned __int64 getVolumeInformationWAddr = NULL;
+unsigned __int64 ntOpenProcessAddr = NULL;
+
+//GetVolumeInformationA()
+typedef ULONG(__stdcall* _GetAdaptersInfo)(PIP_ADAPTER_INFO AdapterInfo, PULONG SizePointer);
+typedef UCHAR(__stdcall* _Netbios)(PNCB pncb);
+typedef BOOL(__stdcall* _GetVolumeInformationW)(LPCWSTR lpRootPathName, LPWSTR lpVolumeNameBuffer, DWORD nVolumeNameSize,
+	LPDWORD lpVolumeSerialNumber, LPDWORD lpMaximumComponentLength, LPDWORD lpFileSystemFlags, LPWSTR lpFileSystemNameBuffer,
+	DWORD nFileSystemNameSize);
 
 namespace MapleStory {
 	LPCWSTR MAPLESTORY_PROCESS = L"MapleStory.exe";
@@ -47,20 +62,34 @@ namespace MapleStory {
 	LPCWSTR MACHINE_ID_LIB_DLL = L"MachineIdLib.dll";
 	LPCWSTR CRASH_REPORTER_DLL = L"CrashReporter_64.dll";
 	LPCWSTR NEXON_ANALYTICS_DLL = L"NexonAnalytics64.dll";
-	LPCWSTR KERNELBASE_DLL = L"KERNELBASE.dll";
-	LPCWSTR NTDLL_DLL = L"ntdll.dll";
 	LPCWSTR KEYSTONE_DLL = L"keystone.dll";
+
+	const char* KERNELBASE_DLL = "KERNELBASE.dll";
+	const char* NTDLL_DLL = "ntdll.dll";
+	const char* IPHLAPI_DLL = "IPHLPAPI.DLL";
+	const char* NETAPI32_DLL = "NETAPI32.dll";
+	// if process config not specified global configuration will be used
+	const char* GLOBAL_CONFIG_FILENAME = "globalConfig.yaml"; 
+	// process config will be used if one exists
+	// this allows us to different HWID for different processes
+	// launcher can be used to manage HWID and create/update this file
+	const char* PROCESS_CONFIG_FILENAME = "config%X.yaml";
 
 	unsigned int MAX_DLL_WAITTIME = 60; // secs to wait for ntdll copy module to load
 
 	PatchManager patchManager = PatchManager();
-	string ipcDir;
+	YAML::Node rootConfig;
+
+	string configDir;
 	bool dllsInjected = false;
 
 	unsigned char* maplestoryCopyBase;
 	char asmBuffer[BUFF_SIZE];
 
 	unsigned __int64 machineId = 0;
+	unsigned int volumeSerialNumber = 0;
+	string macAddress;
+	unsigned char macAddressRaw[6];
 
 	std::string asmReturnFalse = Patch::unindent(R"(
         xor rax, rax
@@ -121,46 +150,240 @@ namespace MapleStory {
 		return patchManager.InstallPatch(true, patch2);
 	}
 
-	std::string getMachineIdHookAsm = R"(mov rax, 0x%llX; jmp rax)";
+	string GenerateMacAddress() {
+		unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+		std::default_random_engine generator(seed);
+		std::uniform_int_distribution<int> distribution(0, 255);
 
-	const unsigned __int64 MIDLib_GetMachineIdHook() {
-		/*
-		 * Original: Gather information from the system and generate an ID
-		 * Patch:	 Generate random 8 byte value to be used as ID
-		 */
-		printf("[MIDLib_GetMachineIdHook] Using randomly generated machine ID\n");
-		if (machineId == 0) {
-			unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-			std::independent_bits_engine<std::mt19937, 64, std::uint_fast64_t> generator(seed);
-			machineId = generator();
+		constexpr int N = 6;
+		std::stringstream sstream;
+		sstream << std::setfill('0') << std::uppercase;
+		for (int i = 0; i < N; ++i) {
+			if (i > 0) sstream << ':';
+			sstream << std::setw(2) << std::hex << distribution(generator);
 		}
-		printf("[MIDLib_GetMachineIdHook] MachineID = 0x%llX\n", machineId);
-		return machineId;
+
+		return sstream.str();
 	}
 
-	bool InstallGetMachineIdHook(PatchManager& patchManager) {
-		HMODULE hMachineIdLib = GetModuleHandleW(MACHINE_ID_LIB_DLL);
-		if (hMachineIdLib == NULL) {
-			wprintf(L"Cannot get handle of the module %s", MACHINE_ID_LIB_DLL);
+	int GenerateSerialNumber() {
+		unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+		std::default_random_engine generator(seed);
+		std::uniform_int_distribution<int> distribution(0, UINT_MAX);
+		unsigned int serialNum = distribution(generator);
+		return serialNum;
+	}
+
+	void SaveConfig(string configDir) {
+		YAML::Node rootConfig;
+		rootConfig["macAddress"] = macAddress;
+		rootConfig["volumeSerialNumber"] = volumeSerialNumber;
+		std::filesystem::path cfgPath{ configDir.c_str()};
+		cfgPath.append(GLOBAL_CONFIG_FILENAME);
+		printf("Saving the configuration to %s\n", cfgPath.string().c_str());
+		
+		std::ofstream configStream;
+		configStream.open(cfgPath.string());
+		std::string yamlConfig = YAML::Dump(rootConfig);
+		configStream << yamlConfig;
+		configStream.close();
+	}
+
+	bool LoadConfig(string cfgPath) {
+		printf("Loading config %s\n", cfgPath.c_str());
+		if (!std::filesystem::exists(cfgPath)) {
 			return false;
 		}
-
-		const unsigned __int64 getMachineIdAddress = (unsigned __int64)GetProcAddress(hMachineIdLib, "MIDLib_GetMachineId");
-		if (getMachineIdAddress == NULL) {
-			printf("Failed to patch machine ID, cannot retrieve the address for the procedure MIDLib_GetMachineId");
+		rootConfig = YAML::Load(cfgPath);
+		if (rootConfig.size() > 0) {
+			if (YAML::Node volumeNode = rootConfig["volumeSerialNumber"]) {
+				volumeSerialNumber = volumeNode.as<int>();
+			}
+			else {
+				return false;
+			}
+			if (YAML::Node macNode = rootConfig["macAddress"]) {
+				macAddress = macNode.as<string>();
+			}
+			else {
+				return false;
+			}
+		}
+		else {
 			return false;
 		}
+		return true;
+	}
 
+	bool LoadPreferredConfig() {
+		char cfgPath[MAX_PATH];
+		sprintf(cfgPath, "%s/config%X.yaml", configDir.c_str(), GetCurrentProcessId());
+
+		if (LoadConfig(cfgPath)) {
+			return true;
+		}
+		sprintf(cfgPath, "%s/%s", configDir.c_str(), GLOBAL_CONFIG_FILENAME);
+		return LoadConfig(cfgPath);
+	}
+
+	std::string getAdaptersInfoAsm = Patch::unindent(R"(
+		mov r8, GetAdaptersInfo
+		
+		mov rax, 0x%llX
+		jmp rax
+
+	    GetAdaptersInfo:
+        mov [rsp+0x08],rbx
+        mov [rsp+0x20],rdi
+		mov rax, 0x%llX
+		jmp rax
+	)");
+
+	ULONG __stdcall GetAdaptersInfoHook(PIP_ADAPTER_INFO adapterInfo, PULONG SizePointer, unsigned __int64 pfnGetAdaptersInfo) {
+		_GetAdaptersInfo getAdaptersInfo = (_GetAdaptersInfo)pfnGetAdaptersInfo;
+		ULONG res = getAdaptersInfo(adapterInfo, SizePointer);
+		if (res == ERROR_SUCCESS) {
+			printf("GetAdaptersInfo - Spoofing MAC address: replacing %02x:%02x:%02x:%02x:%02x:%02x with %02x:%02x:%02x:%02x:%02x:%02x\n", 
+				adapterInfo[0].Address[0], adapterInfo[0].Address[1], adapterInfo[0].Address[2], adapterInfo[0].Address[3], 
+				adapterInfo[0].Address[4], adapterInfo[0].Address[5],
+				macAddressRaw[0], macAddressRaw[1], macAddressRaw[2], macAddressRaw[3], macAddressRaw[4], macAddressRaw[5]);
+			memcpy(adapterInfo[0].Address, macAddressRaw, sizeof(macAddressRaw));
+		}
+		return res;
+	}
+
+	bool InstallGetAdaptersInfoPatch(PatchManager& patchManager) {
 		Patch::PatchManager::Patch patch;
-		patch.name = "MachineIdLib.MIDLib_GetMachineId Hook";
-		sprintf(asmBuffer, asmAbsoluteJumpAsm.c_str(), &MIDLib_GetMachineIdHook);
+
+		patch.address = (unsigned __int64)GetProcAddress(hIPHLPAPI, "GetAdaptersInfo");
+		if (patch.address == NULL) {
+			printf("Failed to patch %s.GetAdaptersInfo, cannot retrieve the address for the procedure address", IPHLAPI_DLL);
+		}
+		unsigned __int64 retAddress = patch.address + 0xA;
+		sprintf_s(asmBuffer, getAdaptersInfoAsm.c_str(), &GetAdaptersInfoHook, retAddress);
+
+		patch.patchType = PatchManager::PatchType::HOOK;
+		patch.hookType = PatchManager::HookType::JUMP;
+
+		sprintf(patchNameBuf, "%s.GetAdaptersInfo hook", IPHLAPI_DLL);
+		patch.name = patchNameBuf;
+
 		patch.assembly = std::string(asmBuffer);
-		patch.patchType = Patch::PatchManager::PatchType::WRITE;
-		patch.address = getMachineIdAddress;
+		patch.hookRegister = "rax";
+		patch.nopCount = 0;
 
 		return patchManager.InstallPatch(true, patch);
 	}
 
+	std::string netbiosAsm = Patch::unindent(R"(
+		mov rdx, Netbios
+
+		mov rax, 0x%llX
+		jmp rax
+
+	    Netbios:
+        mov [rsp+0x08],rbx
+        push rdi
+		sub rsp, 0x20
+		mov rax, 0x%llX
+		jmp rax
+	)");
+
+	UCHAR __stdcall NetbiosHook(PNCB pncb, unsigned __int64 pfnNetbios) {
+		printf("Netbios cmd %02x\n", pncb->ncb_command);
+		_Netbios netbios = (_Netbios)pfnNetbios;
+		UCHAR res = netbios(pncb);
+		if (pncb->ncb_command == NCBASTAT) {
+			ADAPTER_STATUS* adapterStatus = (ADAPTER_STATUS*)pncb->ncb_buffer;
+			printf("NETAPI32.Netbios - Spoofing MAC address: replacing %02x:%02x:%02x:%02x:%02x:%02x with %02x:%02x:%02x:%02x:%02x:%02x\n", 
+				adapterStatus->adapter_address[0], adapterStatus->adapter_address[1], adapterStatus->adapter_address[2], 
+				adapterStatus->adapter_address[3], adapterStatus->adapter_address[4], adapterStatus->adapter_address[5],
+				macAddressRaw[0], macAddressRaw[1], macAddressRaw[2], macAddressRaw[3], macAddressRaw[4], macAddressRaw[5]);
+			memcpy(adapterStatus->adapter_address, macAddressRaw, sizeof(macAddressRaw));
+		}
+		return res;
+	}
+
+	bool InstallNetbiosPatch(PatchManager& patchManager) {
+		Patch::PatchManager::Patch patch;
+
+		patch.address = (unsigned __int64)GetProcAddress(hNetapi32, "Netbios");
+		if (patch.address == NULL) {
+			printf("Failed to patch %s.Netbios, cannot retrieve the address for the procedure address", NETAPI32_DLL);
+		}
+		unsigned __int64 retAddress = patch.address + 0xA;
+		sprintf_s(asmBuffer, netbiosAsm.c_str(), &NetbiosHook, retAddress);
+		printf(asmBuffer);
+
+		patch.patchType = PatchManager::PatchType::HOOK;
+		patch.hookType = PatchManager::HookType::JUMP;
+
+		sprintf(patchNameBuf, "%s.Netbios hook", NETAPI32_DLL);
+		patch.name = patchNameBuf;
+
+		patch.assembly = std::string(asmBuffer);
+		patch.hookRegister = "rax";
+		patch.nopCount = 0;
+
+		return patchManager.InstallPatch(true, patch);
+	}
+
+	std::string getVolumeInformationWAsm = Patch::unindent(R"(
+		push rcx
+		mov rcx, 0x%llX
+		mov rax, GetVolumeInformationW
+		mov [rcx], rax
+		pop rcx
+
+		mov rax, 0x%llX
+		jmp rax
+
+	    GetVolumeInformationW:
+        mov rax,rsp
+        mov [rax+0x08],rbx
+		mov [rax+0x10],rsi
+		mov rsi, 0x%llX
+		jmp rsi
+	)");
+
+	BOOL __stdcall GetVolumeInformationWHook(LPCWSTR lpRootPathName, LPWSTR lpVolumeNameBuffer, DWORD nVolumeNameSize,
+		LPDWORD lpVolumeSerialNumber, LPDWORD lpMaximumComponentLength, LPDWORD lpFileSystemFlags, LPWSTR lpFileSystemNameBuffer,
+		DWORD nFileSystemNameSize) {
+		_GetVolumeInformationW getVolumeInformationW = (_GetVolumeInformationW)getVolumeInformationWAddr;
+
+		bool res = getVolumeInformationW(lpRootPathName, lpVolumeNameBuffer, nVolumeNameSize, lpVolumeSerialNumber,
+			lpMaximumComponentLength, lpFileSystemFlags, lpFileSystemNameBuffer, nFileSystemNameSize);
+
+		if (lpVolumeSerialNumber != NULL) {
+			wprintf(L"GetVolumeInformationW Spoof: replace 0x%X with 0x%X\n", *lpVolumeSerialNumber, volumeSerialNumber);
+			*lpVolumeSerialNumber = volumeSerialNumber;
+		}
+
+		return true;
+	}
+
+	bool InstallGetVolumeInformationAPatch(PatchManager& patchManager) {
+		Patch::PatchManager::Patch patch;
+
+		patch.address = (unsigned __int64)GetProcAddress(hKernelbase, "GetVolumeInformationW");
+		if (patch.address == NULL) {
+			printf("Failed to patch %s.GetVolumeInformationA, cannot retrieve the address for the procedure address", KERNELBASE_DLL);
+		}
+		unsigned __int64 retAddress = patch.address + 0xB;
+		sprintf_s(asmBuffer, getVolumeInformationWAsm.c_str(), &getVolumeInformationWAddr, &GetVolumeInformationWHook, retAddress);
+
+		patch.patchType = PatchManager::PatchType::HOOK;
+		patch.hookType = PatchManager::HookType::JUMP;
+
+		sprintf(patchNameBuf, "%s.GetVolumeInformationW hook", NETAPI32_DLL);
+		patch.name = patchNameBuf;
+
+		patch.assembly = std::string(asmBuffer);
+		patch.hookRegister = "rax";
+		patch.nopCount = 0;
+
+		return patchManager.InstallPatch(true, patch);
+	}
 
 	bool InstallCrashReporterPatch(PatchManager& patchManager) {
 		HMODULE hCrashReporter = GetModuleHandleW(CRASH_REPORTER_DLL);
@@ -238,54 +461,20 @@ namespace MapleStory {
 
 		return patchManager.InstallPatch(true, patch);
 	}
+
 	std::string bcNtOpenProcessAsm = Patch::unindent(R"(
 		mov rax, 0x%llX
 	    cmp [rsp+0x70], rax
 		jne NtOpenProcess
-		push rbx
-        push rcx
-        push rdx
 
-        push rsi
-        push rdi
+		push rcx
+		mov rcx, 0x%llX
+		mov rax, NtOpenProcess
+		mov [rcx], rax
+		pop rcx
 
-        push r8
-        push r9
-        push r10
-        push r11
-        push r12
-        push r13
-        push r14
-        push r15
-        
-        sub rsp, 0x20
-        
-        mov rcx, [r9]
         mov rax, 0x%llX
-        call rax
-
-        add rsp, 0x20
-		
-        pop r15
-        pop r14
-        pop r13
-        pop r12
-        pop r11
-        pop r10
-        pop r9
-        pop r8
-		
-		pop rdi
-        pop rsi
-
-        pop rdx
-        pop rcx
-        pop rbx
-
-        test rax, rax
-        jne NtOpenProcess
-		xor rax, rax
-        ret
+        jmp rax
 
 	    NtOpenProcess:
         mov r10, rcx
@@ -293,22 +482,31 @@ namespace MapleStory {
         syscall
 		ret
 	)");
-	bool WINAPI NtOpenProcessHook(DWORD pid) {
-		if (pid == 0 || pid == GetCurrentProcessId() || pid == blackCipherPid) {
-			printf("Allow access to NtOpenProcess for process 0x%X. MapleStory, BlackCipher64.aes, and system idle\n", pid);
-			if (!dllsInjected && pid == blackCipherPid) {
+	bool WINAPI NtOpenProcessHook(PHANDLE ProcessHandle, ACCESS_MASK DesiredAccess, Patch::POBJECT_ATTRIBUTES ObjectAttributes, PCLIENT_ID ClientId) {
+		if ((DWORD)ClientId->UniqueProcess == 0 || (DWORD)ClientId->UniqueProcess == GetCurrentProcessId() || (DWORD)ClientId->UniqueProcess == blackCipherPid) {
+			printf("Allow access to NtOpenProcess for process 0x%X. MapleStory, BlackCipher64.aes, and system idle\n", (DWORD)ClientId->UniqueProcess);
+			if (!dllsInjected && (DWORD)ClientId->UniqueProcess == blackCipherPid) {
+				wprintf(L"Injecting bypass DLLs into the %s process\n", BLACKCIPHER64);
 				dllsInjected = true;
 				std::filesystem::path bypassDllPath = std::filesystem::path(currentModulePath);
 				wchar_t buff[256];
+
 				wsprintf(buff, L"%s/%s", (wchar_t*)bypassDllPath.parent_path().c_str(), KEYSTONE_DLL);
 				std::filesystem::path keystoneDllPath = std::filesystem::path(buff);
-				wprintf((wchar_t*)keystoneDllPath.c_str());
-				if (!Patch::InjectDll(pid, (wchar_t*)keystoneDllPath.c_str())) {
+				if (!Patch::InjectDll((DWORD)ClientId->UniqueProcess, (wchar_t*)keystoneDllPath.c_str())) {
 					wprintf(L"Failed to inject %s\n", (wchar_t*)keystoneDllPath.c_str());
 					return true;
 				}
-				wprintf((wchar_t*)bypassDllPath.c_str());
-				if (!Patch::InjectDll(pid, (wchar_t*)bypassDllPath.c_str())) {
+
+				wsprintf(buff, L"%s/%s", (wchar_t*)bypassDllPath.parent_path().c_str(), L"yaml-cpp.dll");
+				wprintf(buff);
+				std::filesystem::path yamlCppDllPath = std::filesystem::path(buff);
+				if (!Patch::InjectDll((DWORD)ClientId->UniqueProcess, (wchar_t*)yamlCppDllPath.c_str())) {
+					wprintf(L"Failed to inject %s\n", (wchar_t*)yamlCppDllPath.c_str());
+					return true;
+				}
+
+				if (!Patch::InjectDll((DWORD)ClientId->UniqueProcess, (wchar_t*)bypassDllPath.c_str())) {
 					wprintf(L"Failed to inject %s\n", (wchar_t*)bypassDllPath.c_str());
 					return true;
 				}
@@ -316,7 +514,7 @@ namespace MapleStory {
 			return true;
 		}
 		else {
-			printf("Denying access to NtOpenProcess for the process 0x%X\n", pid);
+			printf("Denying access to NtOpenProcess for the process 0x%X\n", (DWORD)ClientId->UniqueProcess);
 			SetLastError(ERROR_ACCESS_DENIED);
 			return false;
 		}
@@ -333,7 +531,7 @@ namespace MapleStory {
 
 		patch1.address += 0x8;
 
-		sprintf_s(asmBuffer, bcNtOpenProcessAsm.c_str(), processLoggingReturnAddress, &NtOpenProcessHook);
+		sprintf_s(asmBuffer, bcNtOpenProcessAsm.c_str(), processLoggingReturnAddress , &ntOpenProcessAddr, &NtOpenProcessHook);
 
 		patch1.patchType = PatchManager::PatchType::HOOK;
 		patch1.hookType = PatchManager::HookType::JUMP;
@@ -347,23 +545,12 @@ namespace MapleStory {
 		return true;
 	}
 
-	/*
-	bool InstallUnknownRoutinePatch(PatchManager& patchManager) {
-		Patch::PatchManager::Patch patch;
-		patch.address = unknownRoutine1Address;
-		patch.name = "Unknown routine patch - heavily virtualized";
-		patch.assembly = std::string(asmReturnFalse);
-		patch.patchType = Patch::PatchManager::PatchType::WRITE;
-
-		return patchManager.InstallPatch(true, patch);
-	}*/
-
 	bool GenerateTrainerWaitFile() {
 		/*
 		 * Generate a file to notify the trainer the bypass has completed installing patches
 		 */
 		char fileName[128];
-		sprintf_s(fileName, "%s/NGSBypass%X-3", ipcDir.c_str(), GetCurrentProcessId());
+		sprintf_s(fileName, "%s/NGSBypass%X-3", configDir.c_str(), GetCurrentProcessId());
 		std::remove(fileName); // delete file if exists
 		printf("Generating IPC file %s\n", fileName);
 		std::filesystem::path path{ fileName };
@@ -374,19 +561,59 @@ namespace MapleStory {
 
 	bool InstallPatches()
 	{
-		patchManager.Setup();
-
-		hNtdll = GetModuleHandleW(NTDLL_DLL);
+		hNtdll = GetModuleHandleA(NTDLL_DLL);
 		if (hNtdll == NULL) {
-			MessageBoxW(NULL, L"Failed to get NTDLL.dll handle", L"Error", MB_OK | MB_ICONERROR);
+			wprintf(msgBoxBuf, L"Failed to get handle of module %s", NTDLL_DLL);
+			MessageBoxW(NULL, msgBoxBuf, L"Error", MB_OK | MB_ICONERROR);
 			return false;
 		}
 
-		hKernelbase = GetModuleHandleW(KERNELBASE_DLL);
+		hKernelbase = GetModuleHandleA(KERNELBASE_DLL);
 		if (hKernelbase == NULL) {
-			MessageBoxW(NULL, L"Failed to get KERNELBASE.dll handle", L"Error", MB_OK | MB_ICONERROR);
+			wprintf(msgBoxBuf, L"Failed to get handle of module %s", KERNELBASE_DLL);
+			MessageBoxW(NULL, msgBoxBuf, L"Error", MB_OK | MB_ICONERROR);
 			return false;
 		}
+
+		hIPHLPAPI = GetModuleHandleA(IPHLAPI_DLL);
+		if (hIPHLPAPI == NULL) {
+			wprintf(msgBoxBuf, L"Failed to get handle of module %s ", IPHLAPI_DLL);
+			MessageBoxW(NULL, msgBoxBuf, L"Error", MB_OK | MB_ICONERROR);
+			return false;
+		}
+
+		hNetapi32 = GetModuleHandleA(NETAPI32_DLL);
+		if (hNetapi32 == NULL) {
+			wprintf(msgBoxBuf, L"Failed to get handle of module %s ", NETAPI32_DLL);
+			MessageBoxW(NULL, msgBoxBuf, L"Error", MB_OK | MB_ICONERROR);
+			return false;
+		}
+
+		patchManager.Setup();
+		configDir = getenv("appdata") + string("/NGSBypass");
+		
+		if (!LoadPreferredConfig()) {
+			macAddress = GenerateMacAddress();
+			volumeSerialNumber = GenerateSerialNumber();
+			SaveConfig(configDir);
+		}
+
+		if (macAddress.length() != 16) {
+			macAddress = GenerateMacAddress();
+			SaveConfig(configDir);
+		}
+
+		if (volumeSerialNumber == 0) {
+			volumeSerialNumber = GenerateSerialNumber();
+		}
+
+		printf("MAC address: %s\n", macAddress.c_str());
+		printf("Volume Serial Number: 0x%X\n", volumeSerialNumber);
+
+		string macRawStr = macAddress;
+		macRawStr.erase(std::remove(macRawStr.begin(), macRawStr.end(), ':'), macRawStr.end());
+
+		HexToBytes(macRawStr.c_str(), macAddressRaw);
 
 		if (!InstallNtOpenProcessHook(patchManager)) {
 			MessageBoxW(NULL, L"Failed to install NtOpenProcess patches", L"Error", MB_OK | MB_ICONERROR);
@@ -433,32 +660,39 @@ namespace MapleStory {
 			MessageBoxW(NULL, L"Failed to install the CRC bypass", L"Error", MB_OK | MB_ICONERROR);
 			return false;
 		}
+
+		bool success = InstallGetAdaptersInfoPatch(patchManager) &&
+			InstallNetbiosPatch(patchManager) &&
+			InstallGetVolumeInformationAPatch(patchManager);
+
+		if (!success) {
+			MessageBoxW(NULL, L"Failed to install maplestory.exe HWID patches", L"Error", MB_OK | MB_ICONERROR);
+			return false;
+		}
 		
-		bool success = InstallThreadIdCheckPatch(patchManager) &&
+		success = InstallThreadIdCheckPatch(patchManager) &&
 			InstallIsDebuggerPresentPatch(patchManager) &&
 			InstallNexonAnalyticsLogsPatch(patchManager) &&
-			InstallGetMachineIdHook(patchManager) &&
 			InstallCrashReporterPatch(patchManager);
 
 		if (!success) {
 			MessageBoxW(NULL, L"Failed to install maplestory.exe secondary patches", L"Error", MB_OK | MB_ICONERROR);
 			return false;
 		}
-		
-		// InstallUnknownRoutinePatch(patchManager); // heavily virtualized routine; not necessary
 
-		ipcDir = getenv("appdata") + string("/NGSBypass");
+		// InstallUnknownRoutinePatch(patchManager); // heavily virtualized routine; not necessary
 		GenerateTrainerWaitFile();
 		return true;
 	}
 
-	void Main(HMODULE& hModule) {
-		int length = GetModuleFileNameA(hModule, currentModulePath, MAX_PATH);
-		if (length) {
+	void Main(HMODULE hModule) 
+	{
+		if (GetModuleFileNameA(hModule, currentModulePath, sizeof(currentModulePath))) {
 			if (InstallPatches()) {
 				return;
 			}
 		}
+		
 		wprintf(L"Failed to install %s patches\n", MAPLESTORY_PROCESS);
 		wprintf(L"Terminating the process in 5 seconds...\n");
 		Sleep(5000);
